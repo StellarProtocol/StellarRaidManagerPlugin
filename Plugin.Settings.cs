@@ -54,17 +54,32 @@ public sealed partial class Plugin
                 new TextElement(() => "Enable Raid Warning"),
             }, Gap: 6f),
             new TextElement(
-                () => "Use /rw <text> in chat to display a red warning overlay for 5 seconds. Example: /rw Stack now!",
+                () => "Use /rw <text> in chat to trigger a raid warning. Example: /rw Stack now!",
                 Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-            new SeparatorElement(),
-            new TextElement(() => "Display Size"),
             new RowElement(new HudElement[]
             {
-                new ButtonElement(() => "Small",  OnClick: () => SetRwSize("small"),  Active: () => _rwSizeMult == 0.5f),
-                new ButtonElement(() => "Medium", OnClick: () => SetRwSize("medium"), Active: () => _rwSizeMult == 0.75f),
-                new ButtonElement(() => "Large",  OnClick: () => SetRwSize("large"),  Active: () => _rwSizeMult == 1.0f),
-            }, Gap: 8f),
+                new ToggleElement(() => "", Get: () => _rwUseIngameWarning, Set: v => { _rwUseIngameWarning = v; _cfg.Set<bool>("rw_ingame_warning", v); _cfg.Save(); }),
+                new TextElement(() => "Use In-game Warning"),
+            }, Gap: 6f),
+            new TextElement(
+                () => _rwUseIngameWarning
+                    ? "Shows a notice banner via the game's notice system."
+                    : "Shows a custom overlay for 5 seconds.",
+                Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
             new SeparatorElement(),
+            new ConditionalElement(
+                () => !_rwUseIngameWarning,
+                new ColumnElement(new HudElement[]
+                {
+                    new TextElement(() => "Display Size"),
+                    new RowElement(new HudElement[]
+                    {
+                        new ButtonElement(() => "Small",  OnClick: () => SetRwSize("small"),  Active: () => _rwSizeMult == 0.5f),
+                        new ButtonElement(() => "Medium", OnClick: () => SetRwSize("medium"), Active: () => _rwSizeMult == 0.75f),
+                        new ButtonElement(() => "Large",  OnClick: () => SetRwSize("large"),  Active: () => _rwSizeMult == 1.0f),
+                    }, Gap: 8f),
+                    new SeparatorElement(),
+                }, Gap: 8f)),
             new TextElement(() => "Raid Warning Channels"),
             new RowElement(new HudElement[]
             {
@@ -88,7 +103,12 @@ public sealed partial class Plugin
             new RowElement(new HudElement[]
             {
                 new ButtonElement(() => "Test Countdown", OnClick: () => StartCountdown(10)),
-                new ButtonElement(() => "Test Raid Warning", OnClick: () => { _rwText = "Test Raid Warning"; _rwVisible = true; _rwTimer = 5.0; _hud.MarkDirty(); }),
+                new ButtonElement(() => "Test Raid Warning", OnClick: () =>
+                {
+                    if (_rwUseIngameWarning)
+                        _services.NoticeTips.Create(NoticeTipType.Special).WithContent("Test Raid Warning").WithAudio(NoticeTipAudio.DungeonVictory).WithDuration(5f).Show();
+                    else { _rwText = "Test Raid Warning"; _rwVisible = true; _rwTimer = 5.0; _hud.MarkDirty(); }
+                }),
             }, Gap: 8f),
         }, Gap: 8f);
     }
