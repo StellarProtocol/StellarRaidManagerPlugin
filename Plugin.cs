@@ -26,6 +26,7 @@ public sealed partial class Plugin : IStellarPlugin
 
     // Raid warning state
     private bool _rwEnabled;
+    private bool _rwUseIngameWarning;
     private float _rwSizeMult;
     private bool _rwParty;
     private bool _rwGuild;
@@ -47,8 +48,9 @@ public sealed partial class Plugin : IStellarPlugin
         _ctParty   = _cfg.Get<bool>("ct_channel_party", true);
         _ctGuild   = _cfg.Get<bool>("ct_channel_guild", true);
         _ctLocal   = _cfg.Get<bool>("ct_channel_local", false);
-        _rwEnabled   = _cfg.Get<bool>("rw_enabled", true);
-        _rwSizeMult  = SizeToMult(_cfg.Get<string>("rw_size", "large"));
+        _rwEnabled            = _cfg.Get<bool>("rw_enabled", true);
+        _rwUseIngameWarning   = _cfg.Get<bool>("rw_ingame_warning", true);
+        _rwSizeMult           = SizeToMult(_cfg.Get<string>("rw_size", "large"));
         _rwParty     = _cfg.Get<bool>("rw_channel_party", true);
         _rwGuild     = _cfg.Get<bool>("rw_channel_guild", true);
         _rwLocal     = _cfg.Get<bool>("rw_channel_local", false);

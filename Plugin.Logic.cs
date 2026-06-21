@@ -1,5 +1,6 @@
 using System;
 using Stellar.Abstractions.Domain;
+using Stellar.Abstractions.Services;
 
 namespace Stellar.RaidManager;
 
@@ -54,6 +55,18 @@ public sealed partial class Plugin
         if (!text.StartsWith("/rw ", StringComparison.OrdinalIgnoreCase)) return;
         var msg = text["/rw ".Length..].Trim();
         if (msg.Length == 0) return;
+
+        if (_rwUseIngameWarning)
+        {
+            _services.NoticeTips
+                .Create(NoticeTipType.Special)
+                .WithContent(msg)
+                .WithAudio(NoticeTipAudio.DungeonVictory)
+                .WithDuration(5f)
+                .Show();
+            return;
+        }
+
         _rwText    = msg;
         _rwVisible = true;
         _rwTimer   = 5.0;
