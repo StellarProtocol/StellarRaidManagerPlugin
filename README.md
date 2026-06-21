@@ -10,6 +10,8 @@ Displays a large animated countdown on the HUD, visible to all raid members runn
 ### 🔴 Raid Warning
 Flashes a bold red warning message on the HUD for 5 seconds with a smooth fade-out. Ideal for calling mechanics, stack points, or incoming attacks.
 
+Optionally uses the game's native notice banner system (Special banner with victory audio) instead of the custom overlay — toggle in Settings.
+
 ---
 
 ## Commands
@@ -39,7 +41,8 @@ Open **Raid Manager** from the PLUGINS launcher tile (⚔ icon).
 
 **Raid Warning**
 - Enable / disable the `/rw` command
-- Display size — Small / Medium / Large (independent from countdown)
+- **Use In-game Warning** — when on (default), `/rw` shows a Special notice banner with victory audio via the game's native notice system; when off, shows a custom HUD overlay for 5 seconds
+- Display size — Small / Medium / Large (custom overlay only)
 - Active channels — Party, Guild, Local
 
 **Preview**
@@ -51,11 +54,11 @@ Open **Raid Manager** from the PLUGINS launcher tile (⚔ icon).
 
 ## Requirements
 
-- Stellar Mod System **v1.1.0 or above**
+- Stellar Mod System **v1.3.0 or above**
 
 ## Installation
 
-1. Install Stellar Mod System v1.1.0 or above
+1. Install Stellar Mod System v1.3.0 or above
 2. Copy `Stellar.RaidManager.dll` into:
    ```
    <game>\stellar\plugins\stellar-raid-manager\
