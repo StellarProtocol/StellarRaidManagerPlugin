@@ -67,8 +67,9 @@ public sealed partial class Plugin : IStellarPlugin
             Root: BuildHudRoot(),
             DefaultRect: new WindowRect(0f, 72f, 460f, 0f))
         { DynamicDefaultRect = () => new WindowRect(0f, 72f * Scale, 460f, 0f),
-          // Gameplay overlay (countdown / raid warning): draw only while in-world.
-          ShouldRender = () => _services.ClientState.Phase == GamePhase.World });
+          // Gameplay overlay (countdown / raid warning): draw only while in-world and not on a loading screen.
+          ShouldRender = () => _services.ClientState.Phase == GamePhase.World
+                               && (_services.ClientState.UiState & GameUIState.Loading) == 0 });
 
         _settingsWindow = _services.Windows.Register(new WindowRegistration(
             Spec: new WindowSpec(
@@ -78,8 +79,9 @@ public sealed partial class Plugin : IStellarPlugin
                 Category: WindowCategory.Tools,
                 Style: WindowPanelStyle.GlassMenu)
             { Draggable = true, Closable = true, StartVisible = false,
-              // Settings window: available whenever the world is active.
-              ShouldRender = () => _services.ClientState.Phase == GamePhase.World },
+              // Settings window: available whenever the world is active and not on a loading screen.
+              ShouldRender = () => _services.ClientState.Phase == GamePhase.World
+                                   && (_services.ClientState.UiState & GameUIState.Loading) == 0 },
             Root: BuildSettingsRoot(),
             OnClose: () => _settingsWindow.SetVisible(false)));
 
