@@ -65,10 +65,10 @@ public sealed partial class Plugin : IStellarPlugin
             Id: "countdown-timer.hud",
             Anchor: HudAnchor.ScreenCenterX,
             Root: BuildHudRoot(),
-            AutoHideBehindGameMenus: false,
-            HideUntilInWorld: true,
             DefaultRect: new WindowRect(0f, 72f, 460f, 0f))
-        { DynamicDefaultRect = () => new WindowRect(0f, 72f * Scale, 460f, 0f) });
+        { DynamicDefaultRect = () => new WindowRect(0f, 72f * Scale, 460f, 0f),
+          // Gameplay overlay (countdown / raid warning): draw only while in-world.
+          ShouldRender = () => _services.ClientState.Phase == GamePhase.World });
 
         _settingsWindow = _services.Windows.Register(new WindowRegistration(
             Spec: new WindowSpec(
@@ -77,7 +77,9 @@ public sealed partial class Plugin : IStellarPlugin
                 DefaultRect: new WindowRect(810f, 480f, 300f, 0f),
                 Category: WindowCategory.Tools,
                 Style: WindowPanelStyle.GlassMenu)
-            { Draggable = true, Closable = true, StartVisible = false },
+            { Draggable = true, Closable = true, StartVisible = false,
+              // Settings window: available whenever the world is active.
+              ShouldRender = () => _services.ClientState.Phase == GamePhase.World },
             Root: BuildSettingsRoot(),
             OnClose: () => _settingsWindow.SetVisible(false)));
 
