@@ -90,7 +90,9 @@ public sealed partial class Plugin : IStellarPlugin
             IconPng: LoadIconPng(),
             IconKey: null,
             OnOpen: () => _settingsWindow.SetVisible(true))
-        { Group = LauncherGroup.Plugin });
+        { Group = LauncherGroup.Plugin,
+          // Launcher tile: only surface the plugin while in-world.
+          ShouldShow = () => _services.ClientState.Phase == GamePhase.World });
     }
 
     public void Dispose()
