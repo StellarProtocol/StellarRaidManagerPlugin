@@ -10,7 +10,7 @@ public sealed partial class Plugin : IStellarPlugin
     public string Name => "Raid Manager";
 
     private readonly IPluginServices _services;
-    private readonly IHudHandle _hud;
+    private readonly IWindowControl _hud;
     private readonly IWindowControl _settingsWindow;
     private readonly IDisposable _launcherEntry;
     private readonly IConfigSection _cfg;
@@ -61,15 +61,23 @@ public sealed partial class Plugin : IStellarPlugin
         _services.Chat.MessageReceived += _onMessage;
         _services.Framework.Update += _onUpdate;
 
-        _hud = _services.Hud.Register(new HudSpec(
-            Id: "countdown-timer.hud",
-            Anchor: HudAnchor.ScreenCenterX,
-            Root: BuildHudRoot(),
-            DefaultRect: new WindowRect(0f, 72f, 460f, 0f))
-        { DynamicDefaultRect = () => new WindowRect(0f, 72f * Scale, 460f, 0f),
-          // Gameplay overlay (countdown / raid warning): draw only while in-world and not on a loading screen.
-          ShouldRender = () => _services.ClientState.Phase == GamePhase.World
-                               && (_services.ClientState.UiState & GameUIState.Loading) == 0 });
+        _hud = _services.Windows.Register(new WindowRegistration(
+            new WindowSpec(
+                "countdown-timer.hud",
+                "Raid Countdown",
+                new WindowRect(0f, 72f, 460f, 0f),
+                WindowCategory.HUD,
+                WindowPanelStyle.Borderless)
+            {
+                Surface          = SurfaceStyle.HudOverlay,
+                Anchor           = WindowAnchor.Top,
+                Draggable        = true,
+                EditModeDragOnly = true,
+                // Gameplay overlay (countdown / raid warning): draw only while in-world and not on a loading screen.
+                ShouldRender = () => _services.ClientState.Phase == GamePhase.World
+                                     && (_services.ClientState.UiState & GameUIState.Loading) == 0,
+            },
+            BuildHudRoot()));
 
         _settingsWindow = _services.Windows.Register(new WindowRegistration(
             Spec: new WindowSpec(
