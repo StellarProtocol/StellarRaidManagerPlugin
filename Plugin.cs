@@ -10,7 +10,7 @@ public sealed partial class Plugin : IStellarPlugin
     public string Name => "Raid Manager";
 
     private readonly IPluginServices _services;
-    private readonly IHudHandle _hud;
+    private readonly IWindowControl _hud;
     private readonly IWindowControl _settingsWindow;
     private readonly IDisposable _launcherEntry;
     private readonly IConfigSection _cfg;
@@ -61,14 +61,23 @@ public sealed partial class Plugin : IStellarPlugin
         _services.Chat.MessageReceived += _onMessage;
         _services.Framework.Update += _onUpdate;
 
-        _hud = _services.Hud.Register(new HudSpec(
-            Id: "countdown-timer.hud",
-            Anchor: HudAnchor.ScreenCenterX,
-            Root: BuildHudRoot(),
-            AutoHideBehindGameMenus: false,
-            HideUntilInWorld: true,
-            DefaultRect: new WindowRect(0f, 72f, 460f, 0f))
-        { DynamicDefaultRect = () => new WindowRect(0f, 72f * Scale, 460f, 0f) });
+        _hud = _services.Windows.Register(new WindowRegistration(
+            new WindowSpec(
+                "countdown-timer.hud",
+                "Raid Countdown",
+                new WindowRect(0f, 72f, 460f, 0f),
+                WindowCategory.HUD,
+                WindowPanelStyle.Borderless)
+            {
+                Surface          = SurfaceStyle.HudOverlay,
+                Anchor           = WindowAnchor.Top,
+                Draggable        = true,
+                EditModeDragOnly = true,
+                // Gameplay overlay (countdown / raid warning): draw only while in-world and not on a loading screen.
+                ShouldRender = () => _services.ClientState.Phase == GamePhase.World
+                                     && (_services.ClientState.UiState & GameUIState.Loading) == 0,
+            },
+            BuildHudRoot()));
 
         _settingsWindow = _services.Windows.Register(new WindowRegistration(
             Spec: new WindowSpec(
@@ -77,7 +86,10 @@ public sealed partial class Plugin : IStellarPlugin
                 DefaultRect: new WindowRect(810f, 480f, 300f, 0f),
                 Category: WindowCategory.Tools,
                 Style: WindowPanelStyle.GlassMenu)
-            { Draggable = true, Closable = true, StartVisible = false },
+            { Draggable = true, Closable = true, StartVisible = false,
+              // Settings window: available whenever the world is active and not on a loading screen.
+              ShouldRender = () => _services.ClientState.Phase == GamePhase.World
+                                   && (_services.ClientState.UiState & GameUIState.Loading) == 0 },
             Root: BuildSettingsRoot(),
             OnClose: () => _settingsWindow.SetVisible(false)));
 
@@ -86,7 +98,9 @@ public sealed partial class Plugin : IStellarPlugin
             IconPng: LoadIconPng(),
             IconKey: null,
             OnOpen: () => _settingsWindow.SetVisible(true))
-        { Group = LauncherGroup.Plugin });
+        { Group = LauncherGroup.Plugin,
+          // Launcher tile: only surface the plugin while in-world.
+          ShouldShow = () => _services.ClientState.Phase == GamePhase.World });
     }
 
     public void Dispose()
