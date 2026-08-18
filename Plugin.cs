@@ -10,6 +10,7 @@ public sealed partial class Plugin : IStellarPlugin
     public string Name => "Raid Manager";
 
     private readonly IPluginServices _services;
+    private readonly ILocalization _loc;
     private readonly IWindowControl _hud;
     private readonly IWindowControl _settingsWindow;
     private readonly IDisposable _launcherEntry;
@@ -41,6 +42,7 @@ public sealed partial class Plugin : IStellarPlugin
     public Plugin(IPluginServices services)
     {
         _services = services;
+        _loc = services.Localization;
         _cfg = _services.Config.GetSection("settings");
 
         _sizeMult  = SizeToMult(_cfg.Get<string>("size", "large"));
@@ -64,7 +66,7 @@ public sealed partial class Plugin : IStellarPlugin
         _hud = _services.Windows.Register(new WindowRegistration(
             new WindowSpec(
                 "countdown-timer.hud",
-                "Raid Countdown",
+                _loc.T("rm.hud.title"),
                 new WindowRect(0f, 72f, 460f, 0f),
                 WindowCategory.HUD,
                 WindowPanelStyle.Borderless)
@@ -82,7 +84,7 @@ public sealed partial class Plugin : IStellarPlugin
         _settingsWindow = _services.Windows.Register(new WindowRegistration(
             Spec: new WindowSpec(
                 Id: "stellar-raid-manager.settings",
-                Title: "Raid Manager",
+                Title: _loc.T("rm.title"),
                 DefaultRect: new WindowRect(810f, 480f, 300f, 0f),
                 Category: WindowCategory.Tools,
                 Style: WindowPanelStyle.GlassMenu)
@@ -94,7 +96,7 @@ public sealed partial class Plugin : IStellarPlugin
             OnClose: () => _settingsWindow.SetVisible(false)));
 
         _launcherEntry = _services.Launcher.Register(new LauncherEntry(
-            Title: "Raid Manager",
+            Title: _loc.T("rm.title"),
             IconPng: LoadIconPng(),
             IconKey: null,
             OnOpen: () => _settingsWindow.SetVisible(true))
