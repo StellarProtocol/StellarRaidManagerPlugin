@@ -29,7 +29,7 @@ public sealed partial class Plugin
                 {
                     new SpacerElement(Width: W, Height: 0f),
                     new TextElement(
-                        () => "COUNTDOWN",
+                        () => _loc.T("rm.hud.countdown"),
                         Color: () => (ColorRgba?)_services.Theme.Colors.HudText,
                         Width: W, Align: TextAlign.Center, Shadow: true, FontSize: 56, ShadowDistance: 4)
                     { DynamicFontSize = () => (int)(56f * Scale) },
