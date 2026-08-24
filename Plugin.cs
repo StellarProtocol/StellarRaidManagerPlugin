@@ -101,6 +101,8 @@ public sealed partial class Plugin : IStellarPlugin
             IconKey: null,
             OnOpen: () => _settingsWindow.SetVisible(true))
         { Group = LauncherGroup.Plugin,
+          // Re-localize the tile title live on a language change (Title alone is a captured string).
+          TitleProvider = () => _loc.T("rm.title"),
           // Launcher tile: only surface the plugin while in-world.
           ShouldShow = () => _services.ClientState.Phase == GamePhase.World });
     }
