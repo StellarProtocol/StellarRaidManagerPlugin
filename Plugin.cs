@@ -141,8 +141,11 @@ public sealed partial class Plugin : IStellarPlugin
         _        => 1.0f,
     };
 
-    private float Scale   => (_services.Framework.ScreenHeight / 1080f) * _sizeMult;
-    private float RwScale => (_services.Framework.ScreenHeight / 1080f) * _rwSizeMult;
+    // Font sizes below are CANVAS UNITS (v2 design space 2560×1440); the CanvasScaler makes them
+    // resolution-independent. Do NOT fold ScreenHeight in here — that double-scales against the CanvasScaler
+    // (quadratic shrink; text too small at <1440p). See WindowBuilder-Patterns.md (CanvasScaler / UI Scale).
+    private float Scale   => _sizeMult;
+    private float RwScale => _rwSizeMult;
 
     private static byte[]? LoadIconPng()
     {
