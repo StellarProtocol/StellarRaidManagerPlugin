@@ -8,17 +8,23 @@ namespace Stellar.RaidManager;
 
 // ── Punctuate Mark Presets — orchestration + state + persistence ────────────────────────────────────────────────
 //
-// Save the dungeon "punctuate" marks the player currently has placed, then reload the whole layout in one click.
-// The IL2CPP place/read/clear plumbing is in Plugin.Marks.Interop.cs; the window is in Plugin.Marks.Ui.cs. Wired
-// from Plugin.cs (InitMarks/DisposeMarks) and pumped from OnUpdate (TickMarks). Marks are world-anchored absolute
-// coords — a preset is only meaningful in the dungeon it was captured in, so each preset is tagged with the scene
-// it was saved in (a cheap IClientState.CurrentSceneName read; see the "for dungeon" hint in the UI).
+// A preset is a STEPPED SEQUENCE: an ordered list of mark layouts ("steps"). Each step is the whole set of
+// punctuate marks the player had placed when it was captured. During a fight you activate one preset, then walk
+// its steps forward/back (Prev / Next / Reset) — each move clears the board and re-places that step's marks.
+//
+// Multiple presets are stored; exactly one is active at a time, and the user activates it by hand (no scene/dungeon
+// auto-select — marks are absolute world coords, so a step only lines up in the dungeon it was captured in, and the
+// UI just says so). Runtime state = the active preset + a current-step cursor (-1 = nothing applied yet). Persisted:
+// the presets list AND the active preset's name; the step cursor is deliberately NOT persisted (resets on load).
+//
+// The IL2CPP place/read/clear plumbing is in Plugin.Marks.Interop.cs (reused verbatim); the window is in
+// Plugin.Marks.Ui.cs. Wired from Plugin.cs (InitMarks/DisposeMarks) and pumped from OnUpdate (TickMarks).
 //
 // All player-visible status text goes through _loc.T/_loc.TFormat("rm.marks.*") (Rule 10 — RaidManager is
 // localized across Lang/{en,ja,th,id,fil}.json); only the developer-facing _services.Log lines stay English.
 public sealed partial class Plugin
 {
-    // Persisted preset shape (System.Text.Json — public props). MarkPos.Slot is the 1..6 marker slot.
+    // Persisted shapes (System.Text.Json — public props). MarkPos.Slot is the 1..6 marker slot.
     private sealed class MarkPos
     {
         public int Slot { get; set; }
@@ -27,17 +33,27 @@ public sealed partial class Plugin
         public float Z { get; set; }
     }
 
-    private sealed class MarkPreset
+    // One saved layout in a sequence: the full set of marks captured together.
+    private sealed class MarkStep
     {
-        public string Name { get; set; } = "";
-        public string Scene { get; set; } = "";              // IClientState.CurrentSceneName at save time ("" if unknown)
         public List<MarkPos> Marks { get; set; } = new();
     }
 
-    private const int MaxPresets = 12;
+    private sealed class MarkPreset
+    {
+        public string Name { get; set; } = "";
+        public List<MarkStep> Steps { get; set; } = new();
+    }
+
+    private const int MaxPresets = 24;   // safety cap on config growth; not a user-facing feature
 
     private IConfigSection _marksCfg = null!;
     private readonly List<MarkPreset> _presets = new();
+
+    // Active preset (index into _presets, -1 = none) + step cursor (-1 = nothing applied yet). Neither the cursor
+    // nor _activeIndex directly is persisted — the active preset's NAME is, and we resolve it back on load.
+    private int _activeIndex = -1;
+    private int _currentStep = -1;
 
     // Load queue: one mark placed per frame (drained in TickMarks) to avoid same-frame multi-cast issues.
     private readonly Queue<MarkPos> _loadQueue = new();
@@ -47,7 +63,7 @@ public sealed partial class Plugin
     private double _placedPollTimer;
     private const double PlacedPollInterval = 0.5;
 
-    // Name buffer for the "save as" input field.
+    // Name buffer for the "create preset" input field.
     private string _newPresetName = "";
     // Transient status line shown in the window.
     private string _marksStatus = "";
@@ -55,12 +71,15 @@ public sealed partial class Plugin
     private IWindowControl _marksWindow = null!;
     private IDisposable _marksLauncher = null!;
 
+    private MarkPreset? ActivePreset()
+        => _activeIndex >= 0 && _activeIndex < _presets.Count ? _presets[_activeIndex] : null;
+
     private void InitMarks()
     {
         _marksCfg = _services.Config.GetSection("marks");
         LoadPresetsFromConfig();
         RegisterMarksWindow();   // Plugin.Marks.Ui.cs
-        _services.Log.Info($"[MarkPresets] initialized ({_presets.Count} preset(s) loaded)");
+        _services.Log.Info($"[MarkPresets] initialized ({_presets.Count} preset(s) loaded, active={_activeIndex})");
     }
 
     private void DisposeMarks()
@@ -80,7 +99,7 @@ public sealed partial class Plugin
             MkPlaceAt(m.Slot, target);
             if (_loadQueue.Count == 0)
             {
-                _marksStatus = _loc.T("rm.marks.presetPlaced");
+                _marksStatus = _loc.T("rm.marks.stepPlaced");
                 _marksWindow?.MarkDirty();
             }
         }
@@ -99,9 +118,66 @@ public sealed partial class Plugin
         }
     }
 
-    // ── Preset operations ────────────────────────────────────────────────────────
-    private void SaveCurrentAsPreset()
+    // ── Preset-level operations ──────────────────────────────────────────────────
+    private void CreatePreset()
     {
+        string name = _newPresetName.Trim();
+        if (name.Length == 0) name = _loc.TFormat("rm.marks.autoName", _presets.Count + 1);
+
+        if (_presets.Exists(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            _marksStatus = _loc.TFormat("rm.marks.dupName", name);
+            _marksWindow?.MarkDirty();
+            return;
+        }
+        if (_presets.Count >= MaxPresets)
+        {
+            _marksStatus = _loc.TFormat("rm.marks.limit", MaxPresets);
+            _marksWindow?.MarkDirty();
+            return;
+        }
+
+        _presets.Add(new MarkPreset { Name = name });
+        _newPresetName = "";
+        SavePresetsToConfig();
+        _marksStatus = _loc.TFormat("rm.marks.created", name);
+        _marksWindow?.MarkDirty();
+        _services.Log.Info($"[MarkPresets] created '{name}'");
+    }
+
+    // Activate = make this the working preset; reset the cursor to "nothing applied yet" (do NOT auto-place).
+    private void ActivatePreset(int index)
+    {
+        if (index < 0 || index >= _presets.Count) return;
+        _activeIndex = index;
+        _currentStep = -1;
+        SavePresetsToConfig();   // also persists the active-preset name
+        _marksStatus = _loc.TFormat("rm.marks.activated", _presets[index].Name);
+        _marksWindow?.MarkDirty();
+    }
+
+    private void DeletePreset(int index)
+    {
+        if (index < 0 || index >= _presets.Count) return;
+        string name = _presets[index].Name;
+        _presets.RemoveAt(index);
+
+        // Keep _activeIndex pointing at the same preset it did before (or clear it if that one was removed).
+        if (_activeIndex == index) { _activeIndex = -1; _currentStep = -1; }
+        else if (_activeIndex > index) _activeIndex--;
+
+        SavePresetsToConfig();
+        _marksStatus = _loc.TFormat("rm.marks.deleted", name);
+        _marksWindow?.MarkDirty();
+    }
+
+    // ── Step operations (within the ACTIVE preset) ───────────────────────────────
+    // Save Step = capture whatever marks are placed right now and APPEND as a new step (option A: always append).
+    private void SaveStep()
+    {
+        var p = ActivePreset();
+        if (p == null) return;
+
         var marks = MkReadOwnMarks();
         if (marks.Count == 0)
         {
@@ -110,77 +186,98 @@ public sealed partial class Plugin
             return;
         }
 
-        string name = _newPresetName.Trim();
-        if (name.Length == 0) name = _loc.TFormat("rm.marks.autoName", _presets.Count + 1);
+        p.Steps.Add(new MarkStep { Marks = marks });
+        _currentStep = p.Steps.Count - 1;   // cursor lands on the freshly-added step
+        SavePresetsToConfig();
+        _marksStatus = _loc.TFormat("rm.marks.stepSaved", _currentStep + 1, marks.Count);
+        _marksWindow?.MarkDirty();
+        _services.Log.Info($"[MarkPresets] '{p.Name}' saved step {_currentStep + 1} with {marks.Count} marks");
+    }
 
-        string scene = "";
-        try { scene = _services.ClientState.CurrentSceneName ?? ""; } catch { }
+    private void NextStep()
+    {
+        var p = ActivePreset();
+        if (p == null || p.Steps.Count == 0) return;
+        if (_currentStep < p.Steps.Count - 1) { _currentStep++; ApplyStep(_currentStep); }   // clamp at last
+    }
 
-        // Overwrite a same-named preset in place; otherwise append (capped).
-        var existing = _presets.FindIndex(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-        var preset = new MarkPreset { Name = name, Scene = scene, Marks = marks };
-        if (existing >= 0) _presets[existing] = preset;
-        else
+    private void PrevStep()
+    {
+        var p = ActivePreset();
+        if (p == null || p.Steps.Count == 0) return;
+        if (_currentStep > 0) { _currentStep--; ApplyStep(_currentStep); }                    // clamp at first
+    }
+
+    private void ResetSteps()
+    {
+        var p = ActivePreset();
+        if (p == null) return;
+        if (p.Steps.Count == 0)
         {
-            if (_presets.Count >= MaxPresets)
-            {
-                _marksStatus = _loc.TFormat("rm.marks.limit", MaxPresets);
-                _marksWindow?.MarkDirty();
-                return;
-            }
-            _presets.Add(preset);
+            _marksStatus = _loc.T("rm.marks.noSteps");
+            _marksWindow?.MarkDirty();
+            return;
+        }
+        _currentStep = 0;
+        ApplyStep(0);
+    }
+
+    private void DeleteCurrentStep()
+    {
+        var p = ActivePreset();
+        if (p == null) return;
+        if (_currentStep < 0 || _currentStep >= p.Steps.Count)
+        {
+            _marksStatus = _loc.T("rm.marks.noSteps");
+            _marksWindow?.MarkDirty();
+            return;
         }
 
-        _newPresetName = "";
+        int shown = _currentStep + 1;
+        p.Steps.RemoveAt(_currentStep);
+        if (p.Steps.Count == 0) _currentStep = -1;                       // clamp the cursor into range
+        else if (_currentStep >= p.Steps.Count) _currentStep = p.Steps.Count - 1;
+
         SavePresetsToConfig();
-        _marksStatus = _loc.TFormat("rm.marks.saved", name, marks.Count);
+        _marksStatus = _loc.TFormat("rm.marks.stepDeleted", shown);      // do NOT auto-apply after a delete
         _marksWindow?.MarkDirty();
-        _services.Log.Info($"[MarkPresets] saved '{name}' with {marks.Count} marks (scene='{scene}')");
     }
 
-    private void LoadPreset(int index)
+    // Apply a step = clear the whole board, then queue this step's marks (one placed per frame — the validated path).
+    private void ApplyStep(int i)
     {
-        if (index < 0 || index >= _presets.Count) return;
-        var preset = _presets[index];
+        var p = ActivePreset();
+        if (p == null || i < 0 || i >= p.Steps.Count) return;
+        var step = p.Steps[i];
 
-        // Clear existing marks first, then queue the saved layout (one placed per frame).
         MkClearMarks();
         _loadQueue.Clear();
-        foreach (var m in preset.Marks) _loadQueue.Enqueue(m);
+        foreach (var m in step.Marks) _loadQueue.Enqueue(m);
 
-        _marksStatus = _loc.TFormat("rm.marks.loading", preset.Name, preset.Marks.Count);
+        _marksStatus = _loc.TFormat("rm.marks.applying", i + 1, step.Marks.Count);
         _marksWindow?.MarkDirty();
-        _services.Log.Info($"[MarkPresets] loading '{preset.Name}' ({preset.Marks.Count} marks)");
+        _services.Log.Info($"[MarkPresets] applying '{p.Name}' step {i + 1} ({step.Marks.Count} marks)");
     }
 
-    private void DeletePreset(int index)
-    {
-        if (index < 0 || index >= _presets.Count) return;
-        string name = _presets[index].Name;
-        _presets.RemoveAt(index);
-        SavePresetsToConfig();
-        _marksStatus = _loc.TFormat("rm.marks.deleted", name);
-        _marksWindow?.MarkDirty();
-    }
-
-    private void ClearMarksNow()
-    {
-        MkClearMarks();
-        _loadQueue.Clear();
-        _marksStatus = _loc.T("rm.marks.cleared");
-        _marksWindow?.MarkDirty();
-    }
-
-    // ── Persistence (presets serialized as a JSON string in the 'marks' config section) ──────────────────────────
+    // ── Persistence (presets JSON + active-preset name, both in the 'marks' config section) ───────────────────────
     private void LoadPresetsFromConfig()
     {
         _presets.Clear();
+        _activeIndex = -1;
+        _currentStep = -1;
         try
         {
             string json = _marksCfg.Get<string>("presets", "") ?? "";
-            if (json.Length == 0) return;
-            var list = JsonSerializer.Deserialize<List<MarkPreset>>(json);
-            if (list != null) _presets.AddRange(list);
+            if (json.Length > 0)
+            {
+                var list = JsonSerializer.Deserialize<List<MarkPreset>>(json);
+                if (list != null) _presets.AddRange(list);
+            }
+
+            // Resolve the persisted active name back to an index; the step cursor stays at "none applied".
+            string active = _marksCfg.Get<string>("active", "") ?? "";
+            if (active.Length > 0)
+                _activeIndex = _presets.FindIndex(p => string.Equals(p.Name, active, StringComparison.OrdinalIgnoreCase));
         }
         catch (Exception ex) { _services.Log.Warning($"[MarkPresets] preset load failed: {ex.Message}"); }
     }
@@ -190,6 +287,7 @@ public sealed partial class Plugin
         try
         {
             _marksCfg.Set<string>("presets", JsonSerializer.Serialize(_presets));
+            _marksCfg.Set<string>("active", ActivePreset()?.Name ?? "");
             _marksCfg.Save();
         }
         catch (Exception ex) { _services.Log.Warning($"[MarkPresets] preset save failed: {ex.Message}"); }
