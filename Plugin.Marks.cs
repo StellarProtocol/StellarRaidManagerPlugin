@@ -75,8 +75,8 @@ public sealed partial class Plugin
 
     private IWindowControl _marksWindow = null!;
 
-    // Step-navigation hotkeys (fire regardless of window visibility). Defaults land on the numpad (Keypad4/5/6 =
-    // Prev/Reset/Next — a left/center/right mnemonic that no other Stellar plugin binds); all user-rebindable.
+    // Step-navigation hotkeys (fire regardless of window visibility). Declared UNBOUND (SuggestedDefault=null) so
+    // they surface in the hotkey UI with their labels but claim no key until the user assigns one themselves.
     private IHotkeyAction _prevHotkey = null!;
     private IHotkeyAction _resetHotkey = null!;
     private IHotkeyAction _nextHotkey = null!;
@@ -94,13 +94,13 @@ public sealed partial class Plugin
         // "no active preset" itself (see PrevStep/ResetSteps/NextStep), so a stray press just shows an error tip.
         _prevHotkey = _services.Hotkeys.DeclareAction(
             new HotkeyAction("raidmanager.marks.prev", "Mark Presets: Previous step",
-                new KeyBinding(StellarKeyCode.Keypad4)), PrevStep);
+                null), PrevStep);
         _resetHotkey = _services.Hotkeys.DeclareAction(
             new HotkeyAction("raidmanager.marks.reset", "Mark Presets: Reset to Start",
-                new KeyBinding(StellarKeyCode.Keypad5)), ResetSteps);
+                null), ResetSteps);
         _nextHotkey = _services.Hotkeys.DeclareAction(
             new HotkeyAction("raidmanager.marks.next", "Mark Presets: Next step",
-                new KeyBinding(StellarKeyCode.Keypad6)), NextStep);
+                null), NextStep);
 
         _services.Log.Info($"[MarkPresets] initialized ({_presets.Count} preset(s) loaded, active={_activeIndex})");
     }
