@@ -20,7 +20,9 @@ public sealed partial class Plugin
                     new TextElement(
                         () => _rwText,
                         Color: () => new ColorRgba(1f, 0.1f, 0.1f, (float)Math.Clamp(_rwTimer, 0.0, 1.0)),
-                        Emphasis: true, Width: W, Align: TextAlign.Center, Shadow: true, FontSize: 96, ShadowDistance: 6)
+                        // No Emphasis: on HudOverlay, Emphasis re-clobbers fontSize to EmphSize (~15) whenever the
+                        // text changes, defeating DynamicFontSize (see WindowBuilder.Bindings TextBinding.Apply).
+                        Width: W, Align: TextAlign.Center, Shadow: true, FontSize: 96, ShadowDistance: 6)
                     { DynamicFontSize = () => (int)(96f * RwScale) },
                 }, Gap: 8f)),
             new ConditionalElement(
@@ -38,7 +40,8 @@ public sealed partial class Plugin
                         Color: () => _remaining <= 5d
                             ? new ColorRgba(1f, 0.15f, 0.15f, 1f)
                             : (ColorRgba?)_services.Theme.Colors.HudAccent,
-                        Emphasis: true, Width: W, Align: TextAlign.Center, Shadow: true, FontSize: 160, ShadowDistance: 8)
+                        // No Emphasis (see note above): keeps DynamicFontSize=160 instead of being clobbered to ~15.
+                        Width: W, Align: TextAlign.Center, Shadow: true, FontSize: 160, ShadowDistance: 8)
                     { DynamicFontSize = () => (int)(160f * Scale) },
                 }, Gap: 10f)),
         }, Gap: 0f);
