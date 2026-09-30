@@ -57,8 +57,13 @@ public sealed partial class Plugin
                 new CellElement(new TextElement(
                     () => idx < _presets.Count ? _presets[idx].Name : "",
                     Emphasis: true,
-                    // Tint the active row so it reads at a glance.
-                    Color: () => idx == _activeIndex ? (ColorRgba?)_services.Theme.Colors.HudAccent : null), Weight: 1f),
+                    // Tint the active row so it reads at a glance. NON-active rows must return the explicit default
+                    // color, NOT null: a Color lambda that returns null is "leave the color untouched" (the framework
+                    // binding only applies ColorFn() when non-null), so a row painted HudAccent while active would
+                    // STAY yellow after you activate another. Returning MenuText re-paints it back to default.
+                    Color: () => idx == _activeIndex
+                        ? (ColorRgba?)_services.Theme.Colors.HudAccent
+                        : (ColorRgba?)_services.Theme.Colors.MenuText), Weight: 1f),
                 new CellElement(new TextElement(
                     // Steps[0] is the blank Start anchor — count only the real steps (1..N).
                     () => idx < _presets.Count ? _loc.TFormat("rm.marks.stepCount", _presets[idx].Steps.Count - 1) : "",
