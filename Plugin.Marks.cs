@@ -76,6 +76,12 @@ public sealed partial class Plugin
     private IWindowControl _marksWindow = null!;
     private IDisposable _marksLauncher = null!;
 
+    // Step-navigation hotkeys (fire regardless of window visibility). Defaults land on the numpad (Keypad4/5/6 =
+    // Prev/Reset/Next — a left/center/right mnemonic that no other Stellar plugin binds); all user-rebindable.
+    private IHotkeyAction _prevHotkey = null!;
+    private IHotkeyAction _resetHotkey = null!;
+    private IHotkeyAction _nextHotkey = null!;
+
     private MarkPreset? ActivePreset()
         => _activeIndex >= 0 && _activeIndex < _presets.Count ? _presets[_activeIndex] : null;
 
@@ -84,14 +90,71 @@ public sealed partial class Plugin
         _marksCfg = _services.Config.GetSection("marks");
         LoadPresetsFromConfig();
         RegisterMarksWindow();   // Plugin.Marks.Ui.cs
+
+        // Step navigation from the keyboard — usable mid-fight without opening the window. Each op guards on
+        // "no active preset" itself (see PrevStep/ResetSteps/NextStep), so a stray press just shows an error tip.
+        _prevHotkey = _services.Hotkeys.DeclareAction(
+            new HotkeyAction("raidmanager.marks.prev", "Mark Presets: Previous step",
+                new KeyBinding(StellarKeyCode.Keypad4)), PrevStep);
+        _resetHotkey = _services.Hotkeys.DeclareAction(
+            new HotkeyAction("raidmanager.marks.reset", "Mark Presets: Reset to Start",
+                new KeyBinding(StellarKeyCode.Keypad5)), ResetSteps);
+        _nextHotkey = _services.Hotkeys.DeclareAction(
+            new HotkeyAction("raidmanager.marks.next", "Mark Presets: Next step",
+                new KeyBinding(StellarKeyCode.Keypad6)), NextStep);
+
         _services.Log.Info($"[MarkPresets] initialized ({_presets.Count} preset(s) loaded, active={_activeIndex})");
     }
 
     private void DisposeMarks()
     {
+        _prevHotkey?.Dispose();
+        _resetHotkey?.Dispose();
+        _nextHotkey?.Dispose();
         _marksLauncher?.Dispose();
         _marksWindow?.Remove();
     }
+
+    // ── NoticeTip feedback (subtle, on-screen — mirrors the window status line) ────────────────────────────────────
+    // These fire often (Activate + every Prev/Next/Reset), so keep them short and SILENT — deliberately NOT the
+    // Special banner + DungeonVictory sound the /rw path uses. Fully guarded: a notice failure must never break
+    // navigation or crash the game.
+    private void ShowMarksNotice(string content)
+    {
+        try
+        {
+            _services.NoticeTips
+                .Create(NoticeTipType.GreenBar)     // plain info bar (not the /rw Special banner)
+                .WithContent(content)
+                .WithAudio(NoticeTipAudio.Silent)   // silent — nav tips fire too often to sound
+                .WithDuration(2.0f)
+                .Show();
+        }
+        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] notice tip failed: {ex.Message}"); }
+    }
+
+    // Error variant — used when a step hotkey is pressed with no preset active (a rare misuse, so a short red bar
+    // with a light error cue is warranted). Still fully guarded.
+    private void ShowMarksError(string content)
+    {
+        try
+        {
+            _services.NoticeTips
+                .Create(NoticeTipType.RedBar)
+                .WithContent(content)
+                .WithAudio(NoticeTipAudio.ErrorTip)
+                .WithDuration(2.5f)
+                .Show();
+        }
+        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] notice tip failed: {ex.Message}"); }
+    }
+
+    // Localized "resulting step" line for a nav op. Step 0 (the blank anchor) reads "Start"; a real step k reads
+    // "Step k / N" where N == the real step count (Steps[0] is the anchor, so N = Steps.Count - 1).
+    private string MarksStepNotice(MarkPreset p)
+        => _currentStep <= 0
+            ? _loc.TFormat("rm.marks.notice.start", p.Name)
+            : _loc.TFormat("rm.marks.notice.step", p.Name, _currentStep, p.Steps.Count - 1);
 
     // Pumped from OnUpdate (Plugin.Logic.cs). Drains the load queue one mark per frame — Framework.Update runs on
     // the main thread before LateUpdate, which is exactly the timing the indicatorPos_ write needs.
@@ -160,6 +223,7 @@ public sealed partial class Plugin
         SavePresetsToConfig();   // also persists the active-preset name
         _marksStatus = _loc.TFormat("rm.marks.activated", _presets[index].Name);
         _marksWindow?.MarkDirty();
+        ShowMarksNotice(_loc.TFormat("rm.marks.notice.activated", _presets[index].Name));
     }
 
     private void DeletePreset(int index)
@@ -204,26 +268,31 @@ public sealed partial class Plugin
     private void NextStep()
     {
         var p = ActivePreset();
-        if (p == null) return;
+        if (p == null) { ShowMarksError(_loc.T("rm.marks.notice.noActive")); return; }
         // Advance 0→1→…→N (N == last real step); Steps[0] is the anchor so Steps is never empty.
         if (_currentStep < p.Steps.Count - 1) { _currentStep++; ApplyStep(_currentStep); }
+        // Tip reflects the RESULTING step even when clamped at the end (just re-shows the current step).
+        ShowMarksNotice(MarksStepNotice(p));
     }
 
     private void PrevStep()
     {
         var p = ActivePreset();
-        if (p == null) return;
+        if (p == null) { ShowMarksError(_loc.T("rm.marks.notice.noActive")); return; }
         // Step back toward 0; landing on Step 0 (the blank anchor) clears the board.
         if (_currentStep > 0) { _currentStep--; ApplyStep(_currentStep); }
+        // Tip reflects the RESULTING step even when clamped at Start (just re-shows Step 0).
+        ShowMarksNotice(MarksStepNotice(p));
     }
 
     private void ResetSteps()
     {
         var p = ActivePreset();
-        if (p == null) return;
+        if (p == null) { ShowMarksError(_loc.T("rm.marks.notice.noActive")); return; }
         // Reset = go to the blank Start anchor and apply it → clears the board (Steps[0] is always empty).
         _currentStep = 0;
         ApplyStep(0);
+        ShowMarksNotice(MarksStepNotice(p));
     }
 
     private void DeleteCurrentStep()
