@@ -122,7 +122,7 @@ public sealed partial class Plugin
         try
         {
             _services.NoticeTips
-                .Create(NoticeTipType.GreenBar)     // plain info bar (not the /rw Special banner)
+                .Create(NoticeTipType.PopTip)       // neutral center pop-tip (not the /rw Special banner)
                 .WithContent(content)
                 .WithAudio(NoticeTipAudio.Silent)   // silent — nav tips fire too often to sound
                 .WithDuration(2.0f)
@@ -131,14 +131,14 @@ public sealed partial class Plugin
         catch (Exception ex) { _services.Log.Warning($"[MarkPresets] notice tip failed: {ex.Message}"); }
     }
 
-    // Error variant — used when a step hotkey is pressed with no preset active (a rare misuse, so a short red bar
-    // with a light error cue is warranted). Still fully guarded.
+    // Error variant — used when a step hotkey is pressed with no preset active (a rare misuse, so a short center
+    // pop-tip with a light error cue is warranted). Still fully guarded.
     private void ShowMarksError(string content)
     {
         try
         {
             _services.NoticeTips
-                .Create(NoticeTipType.RedBar)
+                .Create(NoticeTipType.PopTip)       // same neutral pop-tip; audible error cue kept below
                 .WithContent(content)
                 .WithAudio(NoticeTipAudio.ErrorTip)
                 .WithDuration(2.5f)
