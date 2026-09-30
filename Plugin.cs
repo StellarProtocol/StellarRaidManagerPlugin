@@ -105,12 +105,16 @@ public sealed partial class Plugin : IStellarPlugin
           TitleProvider = () => _loc.T("rm.title"),
           // Launcher tile: only surface the plugin while in-world.
           ShouldShow = () => _services.ClientState.Phase == GamePhase.World });
+
+        // Punctuate Mark Presets — save/reload dungeon marker layouts (Plugin.Marks*.cs).
+        InitMarks();
     }
 
     public void Dispose()
     {
         _services.Chat.MessageReceived -= _onMessage;
         _services.Framework.Update -= _onUpdate;
+        DisposeMarks();
         _launcherEntry.Dispose();
         _settingsWindow.Remove();
         _hud.Remove();
