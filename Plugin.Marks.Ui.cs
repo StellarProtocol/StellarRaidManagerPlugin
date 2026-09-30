@@ -60,7 +60,8 @@ public sealed partial class Plugin
                     // Tint the active row so it reads at a glance.
                     Color: () => idx == _activeIndex ? (ColorRgba?)_services.Theme.Colors.HudAccent : null), Weight: 1f),
                 new CellElement(new TextElement(
-                    () => idx < _presets.Count ? _loc.TFormat("rm.marks.stepCount", _presets[idx].Steps.Count) : "",
+                    // Steps[0] is the blank Start anchor — count only the real steps (1..N).
+                    () => idx < _presets.Count ? _loc.TFormat("rm.marks.stepCount", _presets[idx].Steps.Count - 1) : "",
                     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 64f),
                 new CellElement(new ButtonElement(() => _loc.T("rm.marks.activate"),
                     OnClick: () => ActivatePreset(idx), Active: () => idx == _activeIndex), Width: 74f),
@@ -107,13 +108,13 @@ public sealed partial class Plugin
                     new TextElement(() => _loc.TFormat("rm.marks.activeHeader", ActivePreset()?.Name ?? ""),
                         Emphasis: true),
 
-                    // Step N / M (or "— / M" when nothing has been applied yet).
+                    // Step 0 = the blank "Start" anchor; real steps are 1..N (N == Steps.Count - 1).
                     new TextElement(() =>
                     {
-                        int n = ActivePreset()?.Steps.Count ?? 0;
-                        return _currentStep < 0
-                            ? _loc.TFormat("rm.marks.stepNone", n)
-                            : _loc.TFormat("rm.marks.step", _currentStep + 1, n);
+                        int n = (ActivePreset()?.Steps.Count ?? 1) - 1;
+                        return _currentStep <= 0
+                            ? _loc.TFormat("rm.marks.stepStart", n)
+                            : _loc.TFormat("rm.marks.step", _currentStep, n);
                     }, Emphasis: true),
 
                     new RowElement(new HudElement[]
@@ -128,7 +129,7 @@ public sealed partial class Plugin
                         new ButtonElement(() => _loc.T("rm.marks.deleteStep"), OnClick: DeleteCurrentStep),
                     }, Gap: 6f),
 
-                    new ConditionalElement(() => (ActivePreset()?.Steps.Count ?? 0) == 0,
+                    new ConditionalElement(() => (ActivePreset()?.Steps.Count ?? 0) <= 1,
                         new TextElement(() => _loc.T("rm.marks.noSteps"),
                             Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted)),
 

@@ -12,10 +12,15 @@ namespace Stellar.RaidManager;
 // punctuate marks the player had placed when it was captured. During a fight you activate one preset, then walk
 // its steps forward/back (Prev / Next / Reset) — each move clears the board and re-places that step's marks.
 //
+// Steps[0] is ALWAYS a permanent blank "Start" anchor (0 marks, undeletable); real saved layouts are steps 1..N.
+// Applying Step 0 clears the board and places nothing (Reset, or stepping back to it). New presets seed Steps with
+// one empty step; on load, any preset whose Steps[0] has marks (or is empty) gets a blank step prepended (migration
+// for presets saved before the anchor existed).
+//
 // Multiple presets are stored; exactly one is active at a time, and the user activates it by hand (no scene/dungeon
 // auto-select — marks are absolute world coords, so a step only lines up in the dungeon it was captured in, and the
-// UI just says so). Runtime state = the active preset + a current-step cursor (-1 = nothing applied yet). Persisted:
-// the presets list AND the active preset's name; the step cursor is deliberately NOT persisted (resets on load).
+// UI just says so). Runtime state = the active preset + a current-step cursor (0 = the blank Start anchor). Persisted:
+// the presets list AND the active preset's name; the step cursor is deliberately NOT persisted (resets to 0 on load).
 //
 // The IL2CPP place/read/clear plumbing is in Plugin.Marks.Interop.cs (reused verbatim); the window is in
 // Plugin.Marks.Ui.cs. Wired from Plugin.cs (InitMarks/DisposeMarks) and pumped from OnUpdate (TickMarks).
@@ -137,7 +142,8 @@ public sealed partial class Plugin
             return;
         }
 
-        _presets.Add(new MarkPreset { Name = name });
+        // Every preset owns a permanent blank Step 0 (the "Start" anchor); real layouts are appended as steps 1..N.
+        _presets.Add(new MarkPreset { Name = name, Steps = { new MarkStep() } });
         _newPresetName = "";
         SavePresetsToConfig();
         _marksStatus = _loc.TFormat("rm.marks.created", name);
@@ -150,7 +156,7 @@ public sealed partial class Plugin
     {
         if (index < 0 || index >= _presets.Count) return;
         _activeIndex = index;
-        _currentStep = -1;
+        _currentStep = 0;   // land on the blank Start anchor; pure selection — do NOT apply/place anything
         SavePresetsToConfig();   // also persists the active-preset name
         _marksStatus = _loc.TFormat("rm.marks.activated", _presets[index].Name);
         _marksWindow?.MarkDirty();
@@ -186,38 +192,36 @@ public sealed partial class Plugin
             return;
         }
 
+        // Always append (never overwrite Step 0). New index >= 1 == the real step number (Steps[0] is the anchor).
         p.Steps.Add(new MarkStep { Marks = marks });
         _currentStep = p.Steps.Count - 1;   // cursor lands on the freshly-added step
         SavePresetsToConfig();
-        _marksStatus = _loc.TFormat("rm.marks.stepSaved", _currentStep + 1, marks.Count);
+        _marksStatus = _loc.TFormat("rm.marks.stepSaved", _currentStep, marks.Count);
         _marksWindow?.MarkDirty();
-        _services.Log.Info($"[MarkPresets] '{p.Name}' saved step {_currentStep + 1} with {marks.Count} marks");
+        _services.Log.Info($"[MarkPresets] '{p.Name}' saved step {_currentStep} with {marks.Count} marks");
     }
 
     private void NextStep()
     {
         var p = ActivePreset();
-        if (p == null || p.Steps.Count == 0) return;
-        if (_currentStep < p.Steps.Count - 1) { _currentStep++; ApplyStep(_currentStep); }   // clamp at last
+        if (p == null) return;
+        // Advance 0→1→…→N (N == last real step); Steps[0] is the anchor so Steps is never empty.
+        if (_currentStep < p.Steps.Count - 1) { _currentStep++; ApplyStep(_currentStep); }
     }
 
     private void PrevStep()
     {
         var p = ActivePreset();
-        if (p == null || p.Steps.Count == 0) return;
-        if (_currentStep > 0) { _currentStep--; ApplyStep(_currentStep); }                    // clamp at first
+        if (p == null) return;
+        // Step back toward 0; landing on Step 0 (the blank anchor) clears the board.
+        if (_currentStep > 0) { _currentStep--; ApplyStep(_currentStep); }
     }
 
     private void ResetSteps()
     {
         var p = ActivePreset();
         if (p == null) return;
-        if (p.Steps.Count == 0)
-        {
-            _marksStatus = _loc.T("rm.marks.noSteps");
-            _marksWindow?.MarkDirty();
-            return;
-        }
+        // Reset = go to the blank Start anchor and apply it → clears the board (Steps[0] is always empty).
         _currentStep = 0;
         ApplyStep(0);
     }
@@ -226,20 +230,20 @@ public sealed partial class Plugin
     {
         var p = ActivePreset();
         if (p == null) return;
-        if (_currentStep < 0 || _currentStep >= p.Steps.Count)
+        if (_currentStep <= 0)                       // Step 0 is the permanent blank anchor — never deletable
         {
-            _marksStatus = _loc.T("rm.marks.noSteps");
+            _marksStatus = _loc.T("rm.marks.stepZeroProtected");
             _marksWindow?.MarkDirty();
             return;
         }
+        if (_currentStep >= p.Steps.Count) return;   // out of range (shouldn't happen) — nothing to delete
 
-        int shown = _currentStep + 1;
+        int shown = _currentStep;                    // real step number == index (Steps[0] is the anchor)
         p.Steps.RemoveAt(_currentStep);
-        if (p.Steps.Count == 0) _currentStep = -1;                       // clamp the cursor into range
-        else if (_currentStep >= p.Steps.Count) _currentStep = p.Steps.Count - 1;
+        if (_currentStep >= p.Steps.Count) _currentStep = p.Steps.Count - 1;   // clamp; falls back to 0 (anchor)
 
         SavePresetsToConfig();
-        _marksStatus = _loc.TFormat("rm.marks.stepDeleted", shown);      // do NOT auto-apply after a delete
+        _marksStatus = _loc.TFormat("rm.marks.stepDeleted", shown);            // do NOT auto-apply after a delete
         _marksWindow?.MarkDirty();
     }
 
@@ -250,13 +254,22 @@ public sealed partial class Plugin
         if (p == null || i < 0 || i >= p.Steps.Count) return;
         var step = p.Steps[i];
 
+        // Applying always clears the board first. Step 0 is the blank anchor → clears and places nothing.
         MkClearMarks();
         _loadQueue.Clear();
         foreach (var m in step.Marks) _loadQueue.Enqueue(m);
 
-        _marksStatus = _loc.TFormat("rm.marks.applying", i + 1, step.Marks.Count);
+        if (i == 0)
+        {
+            _marksStatus = _loc.T("rm.marks.clearedToStart");
+            _marksWindow?.MarkDirty();
+            _services.Log.Info($"[MarkPresets] '{p.Name}' cleared to Start (step 0)");
+            return;
+        }
+
+        _marksStatus = _loc.TFormat("rm.marks.applying", i, step.Marks.Count);   // real step number == index
         _marksWindow?.MarkDirty();
-        _services.Log.Info($"[MarkPresets] applying '{p.Name}' step {i + 1} ({step.Marks.Count} marks)");
+        _services.Log.Info($"[MarkPresets] applying '{p.Name}' step {i} ({step.Marks.Count} marks)");
     }
 
     // ── Persistence (presets JSON + active-preset name, both in the 'marks' config section) ───────────────────────
@@ -274,10 +287,17 @@ public sealed partial class Plugin
                 if (list != null) _presets.AddRange(list);
             }
 
-            // Resolve the persisted active name back to an index; the step cursor stays at "none applied".
+            // Migration: every preset must own a blank Step 0 anchor. Old presets (saved before this feature) have
+            // real layouts starting at Steps[0] — prepend an empty step so their first layout isn't mistaken for it.
+            foreach (var p in _presets)
+                if (p.Steps.Count == 0 || p.Steps[0].Marks.Count > 0)
+                    p.Steps.Insert(0, new MarkStep());
+
+            // Resolve the persisted active name back to an index; the cursor lands on Step 0 (the blank anchor).
             string active = _marksCfg.Get<string>("active", "") ?? "";
             if (active.Length > 0)
                 _activeIndex = _presets.FindIndex(p => string.Equals(p.Name, active, StringComparison.OrdinalIgnoreCase));
+            _currentStep = _activeIndex >= 0 ? 0 : -1;
         }
         catch (Exception ex) { _services.Log.Warning($"[MarkPresets] preset load failed: {ex.Message}"); }
     }
