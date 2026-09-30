@@ -9,6 +9,17 @@ public sealed partial class Plugin
     {
         return new ColumnElement(new HudElement[]
         {
+            // ── Mark Presets ────────────────────────────────────
+            new TextElement(() => _loc.T("rm.marks.title"), Emphasis: true),
+            new TextElement(
+                () => _loc.T("rm.marks.intro"),
+                Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
+            new RowElement(new HudElement[]
+            {
+                new ButtonElement(() => _loc.T("rm.marks.open"), OnClick: () => _marksWindow.SetVisible(true)),
+            }, Gap: 8f),
+            new SeparatorElement(),
+
             new TextElement(() => _loc.T("rm.countdown"), Emphasis: true),
             new RowElement(new HudElement[]
             {
@@ -94,17 +105,6 @@ public sealed partial class Plugin
                 new ToggleElement(() => "", Get: () => _rwLocal, Set: v => { _rwLocal = v; _cfg.Set<bool>("rw_channel_local", v); _cfg.Save(); }),
                 new TextElement(() => _loc.T("rm.channel.local")),
             }, Gap: 6f),
-
-            // ── Mark Presets ────────────────────────────────────
-            new SpacerElement(Height: 4f),
-            new TextElement(() => _loc.T("rm.marks.title"), Emphasis: true),
-            new TextElement(
-                () => _loc.T("rm.marks.intro"),
-                Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-            new RowElement(new HudElement[]
-            {
-                new ButtonElement(() => _loc.T("rm.marks.open"), OnClick: () => _marksWindow.SetVisible(true)),
-            }, Gap: 8f),
 
             new SpacerElement(Height: 4f),
             new TextElement(() => _loc.T("rm.preview"), Emphasis: true),

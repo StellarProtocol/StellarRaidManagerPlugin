@@ -74,7 +74,6 @@ public sealed partial class Plugin
     private string _marksStatus = "";
 
     private IWindowControl _marksWindow = null!;
-    private IDisposable _marksLauncher = null!;
 
     // Step-navigation hotkeys (fire regardless of window visibility). Defaults land on the numpad (Keypad4/5/6 =
     // Prev/Reset/Next — a left/center/right mnemonic that no other Stellar plugin binds); all user-rebindable.
@@ -111,7 +110,6 @@ public sealed partial class Plugin
         _prevHotkey?.Dispose();
         _resetHotkey?.Dispose();
         _nextHotkey?.Dispose();
-        _marksLauncher?.Dispose();
         _marksWindow?.Remove();
     }
 

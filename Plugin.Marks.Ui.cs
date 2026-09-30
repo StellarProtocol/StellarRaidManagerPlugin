@@ -4,11 +4,11 @@ using Stellar.Abstractions.Services;
 
 namespace Stellar.RaidManager;
 
-// ── Punctuate Mark Presets — window + launcher tile ─────────────────────────────────────────────────────────────
+// ── Punctuate Mark Presets — window ─────────────────────────────────────────────────────────────────────────────
 //
-// A dedicated "Mark Presets" window (its own launcher tile, plus an opener button in the Raid Manager settings
-// window — see Plugin.Settings.cs). Gated to World phase like the other windows. State/logic live in
-// Plugin.Marks.cs; interop in Plugin.Marks.Interop.cs.
+// A dedicated "Mark Presets" window, opened from the opener button at the top of the Raid Manager settings
+// window (see Plugin.Settings.cs) — it has no launcher tile of its own. Gated to World phase like the other
+// windows. State/logic live in Plugin.Marks.cs; interop in Plugin.Marks.Interop.cs.
 //
 // The window has three stacked sections: the PRESETS list (activate / delete, active row tinted), a CREATE-preset
 // row, and — only when a preset is active — the STEP panel (Prev / Reset / Next, Save Step, Delete Step, the live
@@ -33,16 +33,6 @@ public sealed partial class Plugin
             },
             Root: BuildMarksRoot(),
             OnClose: () => _marksWindow.SetVisible(false)));
-
-        _marksLauncher = _services.Launcher.Register(new LauncherEntry(
-            Title: _loc.T("rm.marks.title"),
-            IconPng: LoadIconPng(),
-            IconKey: null,
-            OnOpen: () => _marksWindow.SetVisible(true))
-        { Group = LauncherGroup.Plugin,
-          // Re-localize the tile title live on a language change (Title alone is a captured string).
-          TitleProvider = () => _loc.T("rm.marks.title"),
-          ShouldShow = () => _services.ClientState.Phase == GamePhase.World });
     }
 
     private HudElement BuildMarksRoot()
