@@ -19,7 +19,6 @@
   "rm.marks.createHeader": "Buat preset",
   "rm.marks.createHint": "Kosongkan nama untuk penamaan otomatis (Preset N).",
   "rm.marks.created": "\"{0}\" dibuat.",
-  "rm.marks.delete": "Hapus",
   "rm.marks.deleteStep": "Hapus Langkah",
   "rm.marks.deleted": "\"{0}\" dihapus.",
   "rm.marks.dupName": "Preset bernama \"{0}\" sudah ada.",

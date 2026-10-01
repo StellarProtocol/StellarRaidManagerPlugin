@@ -60,8 +60,9 @@ public sealed partial class Plugin
                     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 64f),
                 new CellElement(new ButtonElement(() => _loc.T("rm.marks.activate"),
                     OnClick: () => ActivatePreset(idx), Active: () => idx == _activeIndex), Width: 74f),
-                new CellElement(new ButtonElement(() => _loc.T("rm.marks.delete"),
-                    OnClick: () => DeletePreset(idx)), Width: 66f),
+                // Icon-only trash-can button (procedural PNG, see Plugin.TrashIcon.cs) — no text label.
+                new CellElement(new ButtonElement(() => "",
+                    OnClick: () => DeletePreset(idx), Icon: () => _trashPng), Width: 36f),
             }, Gap: 4f);
         }
 

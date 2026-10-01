@@ -19,7 +19,6 @@
   "rm.marks.createHeader": "プリセットを作成",
   "rm.marks.createHint": "名前を空欄にすると自動命名されます（プリセット N）。",
   "rm.marks.created": "「{0}」を作成しました。",
-  "rm.marks.delete": "削除",
   "rm.marks.deleteStep": "ステップを削除",
   "rm.marks.deleted": "「{0}」を削除しました。",
   "rm.marks.dupName": "「{0}」という名前のプリセットは既に存在します。",

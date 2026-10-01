@@ -19,7 +19,6 @@
   "rm.marks.createHeader": "สร้างพรีเซ็ต",
   "rm.marks.createHint": "เว้นชื่อว่างไว้เพื่อตั้งชื่ออัตโนมัติ (พรีเซ็ต N)",
   "rm.marks.created": "สร้าง \"{0}\" แล้ว",
-  "rm.marks.delete": "ลบ",
   "rm.marks.deleteStep": "ลบสเต็ป",
   "rm.marks.deleted": "ลบ \"{0}\" แล้ว",
   "rm.marks.dupName": "มีพรีเซ็ตชื่อ \"{0}\" อยู่แล้ว",

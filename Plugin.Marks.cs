@@ -87,6 +87,7 @@ public sealed partial class Plugin
     private void InitMarks()
     {
         _marksCfg = _services.Config.GetSection("marks");
+        _trashPng = BuildTrashIconPng();   // Plugin.TrashIcon.cs — per-row Delete button icon
         LoadPresetsFromConfig();
         RegisterMarksWindow();   // Plugin.Marks.Ui.cs
 

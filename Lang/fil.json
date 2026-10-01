@@ -19,7 +19,6 @@
   "rm.marks.createHeader": "Gumawa ng preset",
   "rm.marks.createHint": "Iwanang blangko ang pangalan para sa auto-name (Preset N).",
   "rm.marks.created": "Ginawa ang \"{0}\".",
-  "rm.marks.delete": "Tanggalin",
   "rm.marks.deleteStep": "Tanggalin ang Hakbang",
   "rm.marks.deleted": "Tinanggal ang \"{0}\".",
   "rm.marks.dupName": "May preset nang pangalang \"{0}\".",

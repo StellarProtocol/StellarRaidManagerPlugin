@@ -19,7 +19,6 @@
   "rm.marks.createHeader": "Create preset",
   "rm.marks.createHint": "Leave the name blank to auto-name (Preset N).",
   "rm.marks.created": "Created \"{0}\".",
-  "rm.marks.delete": "Delete",
   "rm.marks.deleteStep": "Delete Step",
   "rm.marks.deleted": "Deleted \"{0}\".",
   "rm.marks.dupName": "A preset named \"{0}\" already exists.",
