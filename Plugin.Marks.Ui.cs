@@ -59,11 +59,12 @@ public sealed partial class Plugin
                     () => idx < _presets.Count ? _loc.TFormat("rm.marks.stepCount", _presets[idx].Steps.Count - 1) : "",
                     Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 64f),
                 // Toggle: the active preset's button reads "Deactivate" and clears the selection; all others read
-                // "Activate" and switch to that preset. The active-row yellow name + the label already signal state,
-                // so the button's Active tint is dropped for a cleaner look.
+                // "Activate" and switch to that preset. Highlight the button (Active tint) while this preset is the
+                // active one — so the "Deactivate" state reads at a glance alongside the yellow row name.
                 new CellElement(new ButtonElement(
                     () => idx == _activeIndex ? _loc.T("rm.marks.deactivate") : _loc.T("rm.marks.activate"),
-                    OnClick: () => { if (idx == _activeIndex) DeactivatePreset(); else ActivatePreset(idx); }), Width: 74f),
+                    OnClick: () => { if (idx == _activeIndex) DeactivatePreset(); else ActivatePreset(idx); },
+                    Active: () => idx == _activeIndex), Width: 74f),
                 // Icon-only trash-can button (procedural PNG, see Plugin.TrashIcon.cs) — no text label.
                 new CellElement(new ButtonElement(() => "",
                     OnClick: () => DeletePreset(idx), Icon: () => _trashPng), Width: 36f),
