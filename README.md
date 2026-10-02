@@ -12,6 +12,16 @@ Flashes a bold red warning message on the HUD for 5 seconds with a smooth fade-o
 
 Optionally uses the game's native notice banner system (Special banner with victory audio) instead of the custom overlay — toggle in Settings.
 
+### 📍 Mark Presets
+Save the dungeon markers you place and reload the whole layout in one click — as multi-step phase sequences.
+
+- **Save a layout as a step** — place your markers, then *Save Step*. A preset is an ordered list of steps (one marker layout per phase).
+- **Walk the sequence during the fight** — *Previous / Reset / Next* each clears the board and places that step's markers. Step 0 is a permanent blank "Start".
+- **A preset per raid** — create and name as many as you like; *Activate* the one you're running (the button toggles to *Deactivate*).
+- Pop-up confirmations on each change, and **Previous / Reset / Next hotkeys** (unbound by default — assign your own in the game's key settings).
+
+Open it from **Raid Manager → Mark Presets**. Marker placement works in dungeons.
+
 ---
 
 ## Commands

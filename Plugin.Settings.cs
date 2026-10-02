@@ -9,6 +9,17 @@ public sealed partial class Plugin
     {
         return new ColumnElement(new HudElement[]
         {
+            // ── Mark Presets ────────────────────────────────────
+            new TextElement(() => _loc.T("rm.marks.title"), Emphasis: true),
+            new TextElement(
+                () => _loc.T("rm.marks.intro"),
+                Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
+            new RowElement(new HudElement[]
+            {
+                new ButtonElement(() => _loc.T("rm.marks.open"), OnClick: () => _marksWindow.SetVisible(true)),
+            }, Gap: 8f),
+            new SeparatorElement(),
+
             new TextElement(() => _loc.T("rm.countdown"), Emphasis: true),
             new RowElement(new HudElement[]
             {

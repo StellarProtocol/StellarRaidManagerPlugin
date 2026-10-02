@@ -96,6 +96,9 @@ public sealed partial class Plugin
 
     private void OnUpdate(float deltaTime)
     {
+        // Punctuate Mark Presets: drain the load queue (one mark/frame) + poll the live placed-count.
+        TickMarks(deltaTime);
+
         if (_running)
         {
             _remaining -= deltaTime;
