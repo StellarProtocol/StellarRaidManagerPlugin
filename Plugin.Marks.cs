@@ -225,6 +225,23 @@ public sealed partial class Plugin
         ShowMarksNotice(_loc.TFormat("rm.marks.notice.activated", _presets[index].Name));
     }
 
+    // Deactivate = clear the active selection entirely (no preset active). Mirror of ActivatePreset: reset the
+    // cursor to "nothing applied yet" and persist the cleared active name so it stays deactivated across relaunch
+    // (SavePresetsToConfig writes ActivePreset()?.Name ?? "" → "" once _activeIndex is -1). Deliberately does NOT
+    // touch the board — marks placed in-world stay put; this only drops the step cursor.
+    private void DeactivatePreset()
+    {
+        var p = ActivePreset();
+        if (p == null) return;          // nothing active — guard (button only shows "Deactivate" when one is active)
+        string name = p.Name;
+        _activeIndex = -1;
+        _currentStep = -1;              // nothing applied yet (matches the no-active-preset load state)
+        SavePresetsToConfig();          // persists the cleared active-preset name (stays deactivated on relaunch)
+        _marksStatus = _loc.TFormat("rm.marks.notice.deactivated", name);
+        _marksWindow?.MarkDirty();
+        ShowMarksNotice(_loc.TFormat("rm.marks.notice.deactivated", name));
+    }
+
     private void DeletePreset(int index)
     {
         if (index < 0 || index >= _presets.Count) return;
