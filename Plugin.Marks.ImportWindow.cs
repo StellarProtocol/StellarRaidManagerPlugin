@@ -10,8 +10,9 @@ namespace Stellar.RaidManager;
 // clipboard, the user pastes (Ctrl+V, or the "Paste from clipboard" button) or types the code into an input field,
 // then presses Import / Enter. Decoding + preset creation live in ImportFromBuffer (Plugin.Marks.Share.cs).
 //
-// InputElement is single-line and drops newlines; that's fine — MarkPresetCode.TryDecode strips all whitespace, so a
-// code wrapped across lines by a chat client still decodes.
+// InputElement drops newlines on submit, and here runs in SingleLine mode (fixed-height, horizontally-scrolling)
+// so a long pasted code neither wraps nor grows this auto-height window. MarkPresetCode.TryDecode strips all
+// whitespace anyway, so a code wrapped across lines by a chat client still decodes.
 //
 // Status: failures (invalid code / preset limit) show HERE and keep the buffer so the user can fix it; success closes
 // this window and reports in the marks window's status line. Opening the window clears the old status but keeps the
@@ -79,10 +80,12 @@ public sealed partial class Plugin
             new RowElement(new HudElement[]
             {
                 // Weight 1 fills the 420 window's content width (≈396).
+                // SingleLine: the field renders one fixed-height line — a long pasted code scrolls
+                // horizontally instead of wrapping and growing this auto-height window (framework opt-in).
                 new CellElement(new InputElement(
                     Get:      () => _importBuffer,
                     Submit:   _ => ImportFromBuffer(),
-                    OnChange: s => _importBuffer = s), Weight: 1f),
+                    OnChange: s => _importBuffer = s) { SingleLine = true }, Weight: 1f),
             }, Gap: 4f),
             new RowElement(new HudElement[]
             {
