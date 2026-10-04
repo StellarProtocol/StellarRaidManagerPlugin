@@ -132,27 +132,32 @@ public sealed partial class Plugin
                             : _loc.TFormat("rm.marks.step", _currentStep, n);
                     }, Emphasis: true),
 
-                    // Per-step comment (Plugin.Marks.StepComment.cs) — real steps only, never the blank Start anchor.
-                    // Same label↔input + pencil↔check swap as the preset rename above.
-                    new ConditionalElement(() => _currentStep >= 1,
-                        new RowElement(new HudElement[]
-                        {
-                            new CellElement(new ConditionalElement(IsEditingStepComment,
-                                new InputElement(
-                                    Get:      () => _commentBuffer,
-                                    Submit:   _ => CommitStepComment(),
-                                    OnChange: s => _commentBuffer = s),
-                                new TextElement(
-                                    () => CurrentStepComment() is { Length: > 0 } c ? c : _loc.T("rm.marks.commentPlaceholder"),
-                                    // Explicit color on BOTH branches — a null would leave the placeholder's muted
-                                    // tint stuck on once a comment is set (Color lambda null = "untouched").
-                                    Color: () => CurrentStepComment().Length > 0
-                                        ? (ColorRgba?)_services.Theme.Colors.MenuText
-                                        : (ColorRgba?)_services.Theme.Colors.TextMuted)), Weight: 1f),
-                            new CellElement(new ConditionalElement(IsEditingStepComment,
-                                new ButtonElement(() => "", OnClick: CommitStepComment, Icon: () => SaveIconPng),
-                                new ButtonElement(() => "", OnClick: EnterStepCommentEdit, Icon: () => EditIconPng)), Width: 36f),
-                        }, Gap: 4f)),
+                    // Per-step comment (Plugin.Marks.StepComment.cs). Same label↔input + pencil↔check swap as the
+                    // preset rename above. The row is ALWAYS present while a preset is active — gating it on
+                    // _currentStep >= 1 added/removed it crossing Start↔Step 1, changing the window height and making
+                    // the whole UI jump. On the blank Start anchor it's read-only instead: CurrentStepComment() is ""
+                    // there (so the muted placeholder shows) and the pencil is disabled — same cells, same size.
+                    new RowElement(new HudElement[]
+                    {
+                        new CellElement(new ConditionalElement(IsEditingStepComment,
+                            new InputElement(
+                                Get:      () => _commentBuffer,
+                                Submit:   _ => CommitStepComment(),
+                                OnChange: s => _commentBuffer = s),
+                            new TextElement(
+                                () => CurrentStepComment() is { Length: > 0 } c ? c : _loc.T("rm.marks.commentPlaceholder"),
+                                // Explicit color on BOTH branches — a null would leave the placeholder's muted
+                                // tint stuck on once a comment is set (Color lambda null = "untouched").
+                                Color: () => CurrentStepComment().Length > 0
+                                    ? (ColorRgba?)_services.Theme.Colors.MenuText
+                                    : (ColorRgba?)_services.Theme.Colors.TextMuted)), Weight: 1f),
+                        new CellElement(new ConditionalElement(IsEditingStepComment,
+                            new ButtonElement(() => "", OnClick: CommitStepComment, Icon: () => SaveIconPng),
+                            // Disabled (not hidden) on Start so the cell keeps its footprint; EnterStepCommentEdit
+                            // also refuses step < 1 on its own.
+                            new ButtonElement(() => "", OnClick: EnterStepCommentEdit,
+                                Enabled: () => _currentStep >= 1, Icon: () => EditIconPng)), Width: 36f),
+                    }, Gap: 4f),
 
                     new RowElement(new HudElement[]
                     {

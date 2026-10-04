@@ -5,8 +5,9 @@ namespace Stellar.RaidManager;
 // Each real step (1..N) of a preset can carry an optional free-text note (MarkStep.Comment, e.g. "P2 — stack west").
 // Same label↔input swap as the preset rename (Plugin.Marks.Rename.cs): the step panel shows the CURRENT step's
 // comment as a label; the pencil chip turns it into an input, the check chip (or Enter) commits. The row itself is
-// built in Plugin.Marks.Ui.cs; this partial owns the edit state + commit. The blank Start anchor (Steps[0]) never
-// shows the row, so it can't be annotated.
+// built in Plugin.Marks.Ui.cs; this partial owns the edit state + commit. The blank Start anchor (Steps[0]) still
+// shows the row (so the window height doesn't jump crossing Start↔Step 1) but read-only: CurrentStepComment() is ""
+// there, the pencil is disabled, and EnterStepCommentEdit refuses — so it can't be annotated.
 //
 // Persistence rides on the existing presets JSON: Comment is a plain public prop on MarkStep, so System.Text.Json
 // writes it with the rest of the step. Configs saved before this field existed simply lack it → the initializer's
