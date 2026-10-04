@@ -11,14 +11,16 @@ namespace Stellar.RaidManager;
 // strict validation live in MarkPresetCode.cs (pure, no Unity); this partial maps the plugin's private
 // MarkPreset/MarkStep/MarkPos to the codec DTOs, owns the export box state, and talks to the clipboard. The two UI
 // pieces (Import button under the create row, Export button + code box in the step panel) are built here and slotted
-// into BuildMarksRoot (Plugin.Marks.Ui.cs) so that file stays small.
+// into BuildMarksRoot (Plugin.Marks.Ui.cs) so that file stays small. Import goes through a separate paste window
+// (Plugin.Marks.ImportWindow.cs): the user pastes/types the code there and ImportFromBuffer decodes it.
 //
 // Export is ON DEMAND and the code is a snapshot: anything that changes what it would contain (switching / deleting /
 // renaming the preset, saving or deleting a step, editing a comment) calls ClearExportCode(), so the box never shows
 // a stale code. The UI additionally gates the box on _exportPresetIdx == _activeIndex as a belt-and-braces check.
 //
 // Clipboard: UnityEngine.GUIUtility.systemCopyBuffer — the IL2CPP-safe clipboard path already used by CombatMeter's
-// CopyUploadLink. Both directions are wrapped in try/catch; a clipboard failure only sets a status line.
+// CopyUploadLink. Both directions (Copy here, "Paste from clipboard" in the import window) are wrapped in try/catch;
+// a clipboard failure only sets a status line.
 public sealed partial class Plugin
 {
     private string _exportCode = "";
@@ -72,30 +74,21 @@ public sealed partial class Plugin
         _marksWindow?.MarkDirty();
     }
 
-    private void ImportFromClipboard()
+    // Decodes _importBuffer (typed/pasted into the import window, Plugin.Marks.ImportWindow.cs). Failures stay IN the
+    // import window (status there, buffer kept so the user can fix it); success reports in the marks window's status
+    // line and closes the import window.
+    private void ImportFromBuffer()
     {
-        string text;
-        try { text = UnityEngine.GUIUtility.systemCopyBuffer ?? ""; }
-        catch (Exception ex)
+        // Invalid code → status only; the preset list is untouched. TryDecode strips all whitespace itself.
+        if (!MarkPresetCode.TryDecode(_importBuffer ?? "", out var dto, out var err))
         {
-            _marksStatus = _loc.T("rm.marks.clipboardFailed");
-            _marksWindow?.MarkDirty();
-            _services.Log.Warning($"[MarkPresets] clipboard read failed: {ex.Message}");
-            return;
-        }
-
-        // Invalid code → status only; the preset list is untouched.
-        if (!MarkPresetCode.TryDecode(text, out var dto, out var err))
-        {
-            _marksStatus = _loc.T("rm.marks.importInvalid");
-            _marksWindow?.MarkDirty();
+            SetImportStatus(_loc.T("rm.marks.importInvalid"), ok: false);
             _services.Log.Info($"[MarkPresets] import rejected: {err}");
             return;
         }
         if (_presets.Count >= MaxPresets)
         {
-            _marksStatus = _loc.TFormat("rm.marks.limit", MaxPresets);
-            _marksWindow?.MarkDirty();
+            SetImportStatus(_loc.TFormat("rm.marks.limit", MaxPresets), ok: false);
             return;
         }
 
@@ -124,6 +117,9 @@ public sealed partial class Plugin
         SavePresetsToConfig();
         _marksStatus = _loc.TFormat("rm.marks.imported", name, dto.Steps.Count);
         _marksWindow?.MarkDirty();
+        _importBuffer = "";
+        SetImportStatus("", ok: true);
+        _importWindow?.SetVisible(false);   // done — the result shows in the marks window's status line
         _services.Log.Info($"[MarkPresets] imported '{name}' ({dto.Steps.Count} steps)");
     }
 
@@ -145,9 +141,9 @@ public sealed partial class Plugin
     }
 
     // ── UI pieces (slotted into BuildMarksRoot) ──────────────────────────────────────────────────────────────────
-    // Full-width button under the create row.
+    // Full-width button under the create row — opens the paste window (Plugin.Marks.ImportWindow.cs).
     private HudElement BuildMarksImportButton()
-        => new ButtonElement(() => _loc.T("rm.marks.import"), OnClick: ImportFromClipboard);
+        => new ButtonElement(() => _loc.T("rm.marks.import"), OnClick: OpenImportWindow);
 
     // Own row in the step panel: Save Step / Delete Step already fill the 440 window in the longer locales
     // (e.g. fil "Tanggalin ang Hakbang"), so a third button there would squeeze/clip. The code box below only shows

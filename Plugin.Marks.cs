@@ -92,6 +92,7 @@ public sealed partial class Plugin
         _trashPng = BuildTrashIconPng();   // Plugin.TrashIcon.cs — per-row Delete button icon
         LoadPresetsFromConfig();
         RegisterMarksWindow();   // Plugin.Marks.Ui.cs
+        RegisterImportWindow();  // Plugin.Marks.ImportWindow.cs — share-code paste window
 
         // Step navigation from the keyboard — usable mid-fight without opening the window. Each op guards on
         // "no active preset" itself (see PrevStep/ResetSteps/NextStep), so a stray press just shows an error tip.
@@ -114,6 +115,7 @@ public sealed partial class Plugin
         _resetHotkey?.Dispose();
         _nextHotkey?.Dispose();
         _marksWindow?.Remove();
+        _importWindow?.Remove();
     }
 
     // ── NoticeTip feedback (subtle, on-screen — mirrors the window status line) ────────────────────────────────────
