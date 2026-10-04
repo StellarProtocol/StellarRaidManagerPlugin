@@ -206,6 +206,7 @@ public sealed partial class Plugin
 
         // Every preset owns a permanent blank Step 0 (the "Start" anchor); real layouts are appended as steps 1..N.
         _presets.Add(new MarkPreset { Name = name, Steps = { new MarkStep() } });
+        _editingIdx = -1;   // list changed — drop any in-progress rename (it is keyed by index)
         _newPresetName = "";
         SavePresetsToConfig();
         _marksStatus = _loc.TFormat("rm.marks.created", name);
@@ -247,6 +248,7 @@ public sealed partial class Plugin
         if (index < 0 || index >= _presets.Count) return;
         string name = _presets[index].Name;
         _presets.RemoveAt(index);
+        _editingIdx = -1;   // indices shifted — an in-progress rename would now point at the wrong row
 
         // Keep _activeIndex pointing at the same preset it did before (or clear it if that one was removed).
         if (_activeIndex == index) { _activeIndex = -1; _currentStep = -1; }

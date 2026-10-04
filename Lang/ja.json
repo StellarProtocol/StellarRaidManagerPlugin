@@ -41,6 +41,7 @@
   "rm.marks.placed.unknown": "現在設置中のマーク: （不明 — ダンジョン内ですか？）",
   "rm.marks.presetsHeader": "プリセット",
   "rm.marks.prev": "◀ 前へ",
+  "rm.marks.renamed": "「{0}」の名前を「{1}」に変更しました。",
   "rm.marks.reset": "リセット",
   "rm.marks.saveStep": "＋ ステップを保存",
   "rm.marks.step": "ステップ {0} / {1}",

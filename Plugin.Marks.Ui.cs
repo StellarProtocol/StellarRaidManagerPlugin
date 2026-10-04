@@ -10,7 +10,7 @@ namespace Stellar.RaidManager;
 // window (see Plugin.Settings.cs) — it has no launcher tile of its own. Gated to World phase like the other
 // windows. State/logic live in Plugin.Marks.cs; interop in Plugin.Marks.Interop.cs.
 //
-// The window has three stacked sections: the PRESETS list (activate / delete, active row tinted), a CREATE-preset
+// The window has three stacked sections: the PRESETS list (activate / rename / delete, active row tinted), a CREATE-preset
 // row, and — only when a preset is active — the STEP panel (Prev / Reset / Next, Save Step, Delete Step, the live
 // placed-count readout and the dungeon hint). Every label is routed through _loc.T/_loc.TFormat("rm.marks.*") —
 // RaidManager is localized across Lang/{en,ja,th,id,fil}.json (Rule 10).
@@ -44,16 +44,23 @@ public sealed partial class Plugin
             var idx = i;
             rows[i] = new RowElement(new HudElement[]
             {
-                new CellElement(new TextElement(
-                    () => idx < _presets.Count ? _presets[idx].Name : "",
-                    Emphasis: true,
-                    // Tint the active row so it reads at a glance. NON-active rows must return the explicit default
-                    // color, NOT null: a Color lambda that returns null is "leave the color untouched" (the framework
-                    // binding only applies ColorFn() when non-null), so a row painted HudAccent while active would
-                    // STAY yellow after you activate another. Returning MenuText re-paints it back to default.
-                    Color: () => idx == _activeIndex
-                        ? (ColorRgba?)_services.Theme.Colors.HudAccent
-                        : (ColorRgba?)_services.Theme.Colors.MenuText), Weight: 1f),
+                // Name: a LABEL by default; the row being renamed swaps to an input field in the same cell (inline
+                // rename, Plugin.Marks.Rename.cs). Enter submits; the check chip below commits the live _editBuffer.
+                new CellElement(new ConditionalElement(() => IsEditing(idx),
+                    new InputElement(
+                        Get:      () => _editBuffer,
+                        Submit:   _ => CommitRename(idx),
+                        OnChange: s => _editBuffer = s),
+                    new TextElement(
+                        () => idx < _presets.Count ? _presets[idx].Name : "",
+                        Emphasis: true,
+                        // Tint the active row so it reads at a glance. NON-active rows must return the explicit
+                        // default color, NOT null: a Color lambda that returns null is "leave the color untouched"
+                        // (the framework binding only applies ColorFn() when non-null), so a row painted HudAccent
+                        // while active would STAY yellow after you activate another. MenuText re-paints the default.
+                        Color: () => idx == _activeIndex
+                            ? (ColorRgba?)_services.Theme.Colors.HudAccent
+                            : (ColorRgba?)_services.Theme.Colors.MenuText)), Weight: 1f),
                 new CellElement(new TextElement(
                     // Steps[0] is the blank Start anchor — count only the real steps (1..N).
                     () => idx < _presets.Count ? _loc.TFormat("rm.marks.stepCount", _presets[idx].Steps.Count - 1) : "",
@@ -64,10 +71,17 @@ public sealed partial class Plugin
                 new CellElement(new ButtonElement(
                     () => idx == _activeIndex ? _loc.T("rm.marks.deactivate") : _loc.T("rm.marks.activate"),
                     OnClick: () => { if (idx == _activeIndex) DeactivatePreset(); else ActivatePreset(idx); },
+                    // Disabled on the row being renamed so an activate/delete can't race the in-progress edit.
+                    Enabled: () => !IsEditing(idx),
                     Active: () => idx == _activeIndex), Width: 74f),
+                // Icon-only rename chip: pencil enters edit mode; while editing, the same cell shows a check that
+                // commits (Wardrobe's edit↔save swap). Embedded PNGs, see Plugin.Marks.Rename.cs.
+                new CellElement(new ConditionalElement(() => IsEditing(idx),
+                    new ButtonElement(() => "", OnClick: () => CommitRename(idx), Icon: () => SaveIconPng),
+                    new ButtonElement(() => "", OnClick: () => EnterEdit(idx), Icon: () => EditIconPng)), Width: 36f),
                 // Icon-only trash-can button (procedural PNG, see Plugin.TrashIcon.cs) — no text label.
                 new CellElement(new ButtonElement(() => "",
-                    OnClick: () => DeletePreset(idx), Icon: () => _trashPng), Width: 36f),
+                    OnClick: () => DeletePreset(idx), Enabled: () => !IsEditing(idx), Icon: () => _trashPng), Width: 36f),
             }, Gap: 4f);
         }
 

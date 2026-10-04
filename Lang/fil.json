@@ -41,6 +41,7 @@
   "rm.marks.placed.unknown": "Mga mark na nakalagay ngayon: (hindi alam — nasa dungeon ka ba?)",
   "rm.marks.presetsHeader": "Mga Preset",
   "rm.marks.prev": "◀ Nakaraan",
+  "rm.marks.renamed": "Pinalitan ang pangalan ng \"{0}\" at ginawang \"{1}\".",
   "rm.marks.reset": "I-reset",
   "rm.marks.saveStep": "+ I-save ang Hakbang",
   "rm.marks.step": "Hakbang {0} / {1}",

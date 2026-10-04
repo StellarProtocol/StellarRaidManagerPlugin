@@ -41,6 +41,7 @@
   "rm.marks.placed.unknown": "Mark terpasang saat ini: (tidak diketahui — sedang di dungeon?)",
   "rm.marks.presetsHeader": "Preset",
   "rm.marks.prev": "◀ Sebelumnya",
+  "rm.marks.renamed": "\"{0}\" diganti namanya menjadi \"{1}\".",
   "rm.marks.reset": "Reset",
   "rm.marks.saveStep": "+ Simpan Langkah",
   "rm.marks.step": "Langkah {0} / {1}",

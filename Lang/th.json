@@ -41,6 +41,7 @@
   "rm.marks.placed.unknown": "มาร์กที่วางอยู่ตอนนี้: (ไม่ทราบ — อยู่ในดันเจียนหรือไม่?)",
   "rm.marks.presetsHeader": "พรีเซ็ต",
   "rm.marks.prev": "◀ ก่อนหน้า",
+  "rm.marks.renamed": "เปลี่ยนชื่อ \"{0}\" เป็น \"{1}\" แล้ว",
   "rm.marks.reset": "รีเซ็ต",
   "rm.marks.saveStep": "+ บันทึกสเต็ป",
   "rm.marks.step": "สเต็ป {0} / {1}",

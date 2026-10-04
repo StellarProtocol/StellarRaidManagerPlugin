@@ -15,6 +15,9 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources/raid-manager-icon.png" LogicalName="Stellar.RaidManager.raid-manager-icon.png" />
+    <!-- Rename edit/save chip icons, copied from StellarWardrobeLoadout/Icons (explicit LogicalName = stable manifest name). -->
+    <EmbeddedResource Include="Icons/edit.png" LogicalName="Stellar.RaidManager.Icons.edit.png" />
+    <EmbeddedResource Include="Icons/save.png" LogicalName="Stellar.RaidManager.Icons.save.png" />
     <EmbeddedResource Include="Lang/en.json" LogicalName="Stellar.RaidManager.Lang.en.json" />
     <EmbeddedResource Include="Lang/ja.json" LogicalName="Stellar.RaidManager.Lang.ja.json" />
     <EmbeddedResource Include="Lang/th.json" LogicalName="Stellar.RaidManager.Lang.th.json" />
