@@ -58,7 +58,8 @@ public sealed partial class Plugin
             }
 
             _presets[idx].Name = name;
-            SavePresetsToConfig();   // also re-writes the active name if this preset is the active one
+            if (idx == _exportPresetIdx) ClearExportCode();   // the code embeds the old name
+            SavePresetsToConfig();  // also re-writes the active name if this preset is the active one
             _marksStatus = _loc.TFormat("rm.marks.renamed", old, name);
             _services.Log.Info($"[MarkPresets] renamed '{old}' -> '{name}'");
         }

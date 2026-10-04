@@ -12,7 +12,8 @@ namespace Stellar.RaidManager;
 //
 // The window has three stacked sections: the PRESETS list (activate / rename / delete, active row tinted), a CREATE-preset
 // row, and — only when a preset is active — the STEP panel (Prev / Reset / Next, Save Step, Delete Step, the live
-// placed-count readout and the dungeon hint). Every label is routed through _loc.T/_loc.TFormat("rm.marks.*") —
+// placed-count readout and the dungeon hint). The share-code Import button / Export panel are built in
+// Plugin.Marks.Share.cs and slotted in below. Every label is routed through _loc.T/_loc.TFormat("rm.marks.*") —
 // RaidManager is localized across Lang/{en,ja,th,id,fil}.json (Rule 10).
 public sealed partial class Plugin
 {
@@ -114,6 +115,7 @@ public sealed partial class Plugin
             new TextElement(
                 () => _loc.T("rm.marks.createHint"),
                 Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
+            BuildMarksImportButton(),   // share-code import (Plugin.Marks.Share.cs)
 
             // ── Active-preset step panel (only when one is active) ──
             new ConditionalElement(() => _activeIndex >= 0 && _activeIndex < _presets.Count,
@@ -170,6 +172,7 @@ public sealed partial class Plugin
                         new ButtonElement(() => _loc.T("rm.marks.saveStep"),   OnClick: SaveStep),
                         new ButtonElement(() => _loc.T("rm.marks.deleteStep"), OnClick: DeleteCurrentStep),
                     }, Gap: 6f),
+                    BuildMarksExportPanel(),   // Export Code + code box (Plugin.Marks.Share.cs)
 
                     new ConditionalElement(() => (ActivePreset()?.Steps.Count ?? 0) <= 1,
                         new TextElement(() => _loc.T("rm.marks.noSteps"),

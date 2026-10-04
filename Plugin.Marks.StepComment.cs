@@ -48,6 +48,7 @@ public sealed partial class Plugin
         if (p != null && i >= 1 && i < p.Steps.Count)
         {
             p.Steps[i].Comment = _commentBuffer?.Trim() ?? "";
+            ClearExportCode();   // comment changed → any exported code is stale
             SavePresetsToConfig();
             _marksStatus = _loc.TFormat("rm.marks.commentSaved", i);   // real step number == index (Steps[0] = anchor)
             _services.Log.Info($"[MarkPresets] '{p.Name}' step {i} comment set ({p.Steps[i].Comment.Length} chars)");

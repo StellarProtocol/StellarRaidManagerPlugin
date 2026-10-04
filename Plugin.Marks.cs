@@ -227,6 +227,7 @@ public sealed partial class Plugin
     {
         if (index < 0 || index >= _presets.Count) return;
         CancelStepCommentEdit();   // preset switch — a step-comment edit belongs to the old preset
+        ClearExportCode();         // share code belongs to the old preset (Plugin.Marks.Share.cs)
         _activeIndex = index;
         _currentStep = 0;   // land on the blank Start anchor; pure selection — do NOT apply/place anything
         SavePresetsToConfig();   // also persists the active-preset name
@@ -245,6 +246,7 @@ public sealed partial class Plugin
         if (p == null) return;          // nothing active — guard (button only shows "Deactivate" when one is active)
         string name = p.Name;
         CancelStepCommentEdit();
+        ClearExportCode();
         _activeIndex = -1;
         _currentStep = -1;              // nothing applied yet (matches the no-active-preset load state)
         SavePresetsToConfig();          // persists the cleared active-preset name (stays deactivated on relaunch)
@@ -260,6 +262,7 @@ public sealed partial class Plugin
         _presets.RemoveAt(index);
         _editingIdx = -1;   // indices shifted — an in-progress rename would now point at the wrong row
         CancelStepCommentEdit();
+        ClearExportCode();  // _exportPresetIdx is an index too — shifted/removed along with the list
 
         // Keep _activeIndex pointing at the same preset it did before (or clear it if that one was removed).
         if (_activeIndex == index) { _activeIndex = -1; _currentStep = -1; }
@@ -286,6 +289,7 @@ public sealed partial class Plugin
         }
 
         CancelStepCommentEdit();   // cursor is about to jump to the new step
+        ClearExportCode();         // new step → any exported code is stale
         // Always append (never overwrite Step 0). New index >= 1 == the real step number (Steps[0] is the anchor).
         p.Steps.Add(new MarkStep { Marks = marks });
         _currentStep = p.Steps.Count - 1;   // cursor lands on the freshly-added step
@@ -341,7 +345,8 @@ public sealed partial class Plugin
         if (_currentStep >= p.Steps.Count) return;   // out of range (shouldn't happen) — nothing to delete
 
         CancelStepCommentEdit();
-        int shown = _currentStep;                    // real step number == index (Steps[0] is the anchor)
+        ClearExportCode();                           // step removed → any exported code is stale
+        int shown = _currentStep;                   // real step number == index (Steps[0] is the anchor)
         p.Steps.RemoveAt(_currentStep);
         if (_currentStep >= p.Steps.Count) _currentStep = p.Steps.Count - 1;   // clamp; falls back to 0 (anchor)
 
