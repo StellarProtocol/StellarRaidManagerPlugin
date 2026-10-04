@@ -22,7 +22,7 @@ public sealed partial class Plugin
             Spec: new WindowSpec(
                 Id: "stellar-raid-manager.marks",
                 Title: _loc.T("rm.marks.title"),
-                DefaultRect: new WindowRect(500f, 300f, 340f, 0f),
+                DefaultRect: new WindowRect(500f, 300f, 440f, 0f),
                 Category: WindowCategory.Tools,
                 Style: WindowPanelStyle.GlassMenu)
             {
