@@ -7,12 +7,13 @@ namespace Stellar.RaidManager;
 // ── Punctuate Mark Presets — import (paste) window ────────────────────────────────────────────────────────────────
 //
 // Opened by the "Import code…" button in the Mark Presets window. Instead of silently reading whatever is on the
-// clipboard, the user pastes (Ctrl+V, or the "Paste from clipboard" button) or types the code into an input field,
-// then presses Import / Enter. Decoding + preset creation live in ImportFromBuffer (Plugin.Marks.Share.cs).
+// clipboard, the user pastes (Ctrl+V, or the "Paste from clipboard" button) or types the code into a multi-line text
+// area, then presses Import. Decoding + preset creation live in ImportFromBuffer (Plugin.Marks.Share.cs).
 //
-// InputElement drops newlines on submit, and here runs in SingleLine mode (fixed-height, horizontally-scrolling)
-// so a long pasted code neither wraps nor grows this auto-height window. MarkPresetCode.TryDecode strips all
-// whitespace anyway, so a code wrapped across lines by a chat client still decodes.
+// TextAreaElement is a fixed-height box (Lines rows) that wraps a long pasted code across several visible lines and
+// scrolls past that, so it never grows this auto-height window. It has NO submit: Enter inserts a newline (and keeps
+// focus), so the Import button is the only way to import. The raw buffer — newlines and all — goes straight to
+// MarkPresetCode.TryDecode, which strips all whitespace, so Enter-typed or chat-wrapped line breaks still decode.
 //
 // Status: failures (invalid code / preset limit) show HERE and keep the buffer so the user can fix it; success closes
 // this window and reports in the marks window's status line. Opening the window clears the old status but keeps the
@@ -79,13 +80,14 @@ public sealed partial class Plugin
             new TextElement(() => _loc.T("rm.marks.importLabel"), Emphasis: true),
             new RowElement(new HudElement[]
             {
-                // Weight 1 fills the 420 window's content width (≈396).
-                // SingleLine: the field renders one fixed-height line — a long pasted code scrolls
-                // horizontally instead of wrapping and growing this auto-height window (framework opt-in).
-                new CellElement(new InputElement(
+                // Weight 1 fills the 420 window's content width (≈396). Width is passed too: the TextArea pins its
+                // preferredWidth (default 260) at layout priority 2, which also sets the cell's natural width —
+                // 396 keeps it full-width rather than relying on the cell's force-expand alone.
+                // Lines 5: a pasted code wraps across ~5 visible rows; longer text scrolls inside the fixed box.
+                new CellElement(new TextAreaElement(
                     Get:      () => _importBuffer,
-                    Submit:   _ => ImportFromBuffer(),
-                    OnChange: s => _importBuffer = s) { SingleLine = true }, Weight: 1f),
+                    OnChange: s => _importBuffer = s,
+                    Width:    396f) { Lines = 5 }, Weight: 1f),
             }, Gap: 4f),
             new RowElement(new HudElement[]
             {
