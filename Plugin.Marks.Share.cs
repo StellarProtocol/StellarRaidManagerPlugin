@@ -67,7 +67,6 @@ public sealed partial class Plugin
         {
             UnityEngine.GUIUtility.systemCopyBuffer = _exportCode;   // plugins may reference UnityEngine; IL2CPP-safe clipboard
             _marksStatus = _loc.T("rm.marks.copied");
-            ShowMarksNotice(_loc.T("rm.marks.copied"));
             SetExportStatus(_loc.T("rm.marks.copied"), ok: true);          // feedback in the export window too
         }
         catch (Exception ex)
