@@ -189,7 +189,10 @@ public sealed partial class Plugin
                 }, Gap: 6f)),
 
             // ── Status line ─────────────────────────────────────
-            new SeparatorElement(),
+            // Divider only while the step panel is shown — with no active preset it would sit directly under the
+            // Import Preset button with nothing to separate.
+            new ConditionalElement(() => _activeIndex >= 0 && _activeIndex < _presets.Count,
+                new SeparatorElement()),
             new ConditionalElement(() => _marksStatus.Length > 0,
                 new TextElement(() => _marksStatus,
                     Color: () => (ColorRgba?)_services.Theme.Colors.HudAccent)),
