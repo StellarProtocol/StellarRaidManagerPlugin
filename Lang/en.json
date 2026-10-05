@@ -32,6 +32,8 @@
   "rm.marks.empty": "No presets yet — create one below.",
   "rm.marks.export": "Export Code",
   "rm.marks.exportFailed": "This preset can't be exported (too many steps or invalid marks).",
+  "rm.marks.exportLabel": "Code for “{0}”:",
+  "rm.marks.exportTitle": "Export Mark Preset",
   "rm.marks.exported": "Share code for \"{0}\" is ready — press Copy.",
   "rm.marks.header": "Punctuate Mark Presets",
   "rm.marks.hint": "Placement works in dungeons (as leader). Marks are absolute world coords — a step only lines up in the dungeon it was captured in.",

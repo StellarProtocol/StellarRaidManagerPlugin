@@ -93,6 +93,7 @@ public sealed partial class Plugin
         LoadPresetsFromConfig();
         RegisterMarksWindow();   // Plugin.Marks.Ui.cs
         RegisterImportWindow();  // Plugin.Marks.ImportWindow.cs — share-code paste window
+        RegisterExportWindow();  // Plugin.Marks.ExportWindow.cs — share-code copy window
 
         // Step navigation from the keyboard — usable mid-fight without opening the window. Each op guards on
         // "no active preset" itself (see PrevStep/ResetSteps/NextStep), so a stray press just shows an error tip.
@@ -116,6 +117,7 @@ public sealed partial class Plugin
         _nextHotkey?.Dispose();
         _marksWindow?.Remove();
         _importWindow?.Remove();
+        _exportWindow?.Remove();
     }
 
     // ── NoticeTip feedback (subtle, on-screen — mirrors the window status line) ────────────────────────────────────
@@ -168,7 +170,9 @@ public sealed partial class Plugin
     // the main thread before LateUpdate, which is exactly the timing the indicatorPos_ write needs.
     private void TickMarks(float deltaTime)
     {
-        TickImportReposition();   // first-open anchor re-apply for the import window (Plugin.Marks.ImportWindow.cs)
+        // First-open anchor re-apply for the share-code popups (Plugin.Marks.ImportWindow.cs / .ExportWindow.cs).
+        TickPopupReposition(_importWindow, _importRect, ref _importRepositionTicks);
+        TickPopupReposition(_exportWindow, _exportRect, ref _exportRepositionTicks);
 
         if (_loadQueue.Count > 0)
         {

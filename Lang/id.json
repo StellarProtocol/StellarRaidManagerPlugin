@@ -32,6 +32,8 @@
   "rm.marks.empty": "Belum ada preset — buat satu di bawah.",
   "rm.marks.export": "Ekspor Kode",
   "rm.marks.exportFailed": "Preset ini tidak bisa diekspor (terlalu banyak langkah atau mark tidak valid).",
+  "rm.marks.exportLabel": "Kode untuk “{0}”:",
+  "rm.marks.exportTitle": "Ekspor Preset Mark",
   "rm.marks.exported": "Kode berbagi untuk \"{0}\" siap — tekan Salin.",
   "rm.marks.header": "Preset Mark Punctuate",
   "rm.marks.hint": "Pemasangan berfungsi di dungeon (ketua). Mark memakai koordinat dunia absolut — langkah hanya cocok di dungeon tempat ia direkam.",

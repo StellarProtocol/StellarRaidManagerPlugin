@@ -32,6 +32,8 @@
   "rm.marks.empty": "Wala pang preset — gumawa ng isa sa ibaba.",
   "rm.marks.export": "I-export ang Code",
   "rm.marks.exportFailed": "Hindi ma-export ang preset na ito (sobrang daming hakbang o may hindi wastong mark).",
+  "rm.marks.exportLabel": "Code para sa “{0}”:",
+  "rm.marks.exportTitle": "I-export ang Mark Preset",
   "rm.marks.exported": "Handa na ang share code ng \"{0}\" — pindutin ang Kopyahin.",
   "rm.marks.header": "Mga Preset ng Punctuate Mark",
   "rm.marks.hint": "Gumagana ang paglalagay sa mga dungeon (leader). Ang mga mark ay absolute world coords — tutugma lang ang hakbang sa dungeon kung saan ito na-capture.",

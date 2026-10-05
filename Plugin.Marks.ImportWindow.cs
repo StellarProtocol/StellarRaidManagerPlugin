@@ -47,7 +47,7 @@ public sealed partial class Plugin
 
     private const float ImportWidth = 420f;          // = DefaultRect width
     private const float ImportHeightEstimate = 220f; // auto-height window; used until it has been mounted once
-    private const float ImportAnchorGap = 6f;
+    private const float PopupAnchorGap = 6f;
     private WindowRect _importRect;                  // anchored rect, re-applied for a few frames after opening
     private int _importRepositionTicks;
 
@@ -58,43 +58,46 @@ public sealed partial class Plugin
     private void OpenImportWindowAt(WindowRect btn)
     {
         SetImportStatus("", ok: true);   // keep the buffer — a half-pasted code survives an accidental close
-        _importRect = AnchorImportRect(btn);
+        _importRect = AnchorBelowButton(btn, ImportWidth, ImportHeightEstimate, _importWindow.Rect.Height);
         _importWindow.SetVisible(true);
         _importWindow.SetRect(_importRect);
         // First-ever open MOUNTS the window and the mount applies DefaultRect AFTER this SetRect, so it would land at
-        // the default spot. Re-assert the anchored rect for the next few ticks (TickImportReposition) —
+        // the default spot. Re-assert the anchored rect for the next few ticks (TickPopupReposition) —
         // WindowBuilder-Patterns.md, "Click-to-open tooltip" first-open bug.
         _importRepositionTicks = 4;
     }
 
+    // Shared by the import and export windows (Plugin.Marks.ExportWindow.cs): a `width`-wide popup just below the
+    // button, left-aligned to it, flipped ABOVE when there is no room below. `currentHeight` is the window's live
+    // (auto) height; 0 before its first mount → `fallbackHeight`.
     // OnClickWithRect reports SCREEN PIXELS (top-left origin), but WindowRect / SetRect / IWindowControl.Rect are
     // CANVAS UNITS (anchoredPosition) — convert by the UI scale first, or the window drifts off the button whenever
     // the UI scale ≠ 1. Canvas size falls back to screen size if the framework hasn't measured the canvas yet.
-    private WindowRect AnchorImportRect(WindowRect btn)
+    private WindowRect AnchorBelowButton(WindowRect btnPx, float width, float fallbackHeight, float currentHeight)
     {
         var fw = _services.Framework;
         float cw = fw.CanvasWidth  > 0 ? fw.CanvasWidth  : fw.ScreenWidth;
         float ch = fw.CanvasHeight > 0 ? fw.CanvasHeight : fw.ScreenHeight;
         float px2cu = fw.ScreenWidth > 0 && cw > 0 ? cw / fw.ScreenWidth : 1f;
 
-        float bx = btn.X * px2cu, by = btn.Y * px2cu, bh = btn.Height * px2cu;
-        float h  = _importWindow.Rect.Height > 0f ? _importWindow.Rect.Height : ImportHeightEstimate;
+        float bx = btnPx.X * px2cu, by = btnPx.Y * px2cu, bh = btnPx.Height * px2cu;
+        float h  = currentHeight > 0f ? currentHeight : fallbackHeight;
 
-        // Just below the button, left-aligned to it; flip ABOVE the button when there is no room below.
-        float y = by + bh + ImportAnchorGap;
-        if (y + h > ch) y = by - ImportAnchorGap - h;
+        float y = by + bh + PopupAnchorGap;
+        if (y + h > ch) y = by - PopupAnchorGap - h;
         // Keep it fully on screen (SetRect clamps too, but keep the stashed rect honest for the re-apply ticks).
-        float x = Math.Max(0f, Math.Min(bx, cw - ImportWidth));
+        float x = Math.Max(0f, Math.Min(bx, cw - width));
         y = Math.Max(0f, Math.Min(y, ch - h));
-        return new WindowRect(x, y, ImportWidth, 0f);   // Height 0 = auto (not Resizable, so size is ignored anyway)
+        return new WindowRect(x, y, width, 0f);   // Height 0 = auto (not Resizable, so size is ignored anyway)
     }
 
-    // Called every tick from TickMarks (Plugin.Marks.cs): re-assert the anchored rect for a few ticks after an open.
-    private void TickImportReposition()
+    // Called every tick from TickMarks (Plugin.Marks.cs) for each anchored popup: re-assert its rect for a few ticks
+    // after an open (first-open mount fix above).
+    private static void TickPopupReposition(IWindowControl? win, WindowRect rect, ref int ticks)
     {
-        if (_importRepositionTicks <= 0) return;
-        _importRepositionTicks--;
-        if (_importWindow.IsShown) _importWindow.SetRect(_importRect);
+        if (ticks <= 0) return;
+        ticks--;
+        if (win != null && win.IsShown) win.SetRect(rect);
     }
 
     private void SetImportStatus(string text, bool ok)
