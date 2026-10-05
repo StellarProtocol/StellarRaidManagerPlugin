@@ -168,6 +168,8 @@ public sealed partial class Plugin
     // the main thread before LateUpdate, which is exactly the timing the indicatorPos_ write needs.
     private void TickMarks(float deltaTime)
     {
+        TickImportReposition();   // first-open anchor re-apply for the import window (Plugin.Marks.ImportWindow.cs)
+
         if (_loadQueue.Count > 0)
         {
             var m = _loadQueue.Dequeue();

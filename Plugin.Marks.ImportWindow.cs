@@ -6,9 +6,9 @@ namespace Stellar.RaidManager;
 
 // ── Punctuate Mark Presets — import (paste) window ────────────────────────────────────────────────────────────────
 //
-// Opened by the "Import code…" button in the Mark Presets window. Instead of silently reading whatever is on the
-// clipboard, the user pastes (Ctrl+V, or the "Paste from clipboard" button) or types the code into a multi-line text
-// area, then presses Import. Decoding + preset creation live in ImportFromBuffer (Plugin.Marks.Share.cs).
+// Opened by the "Import code…" button in the Mark Presets window, anchored just below it (above if no room).
+// Instead of silently reading whatever is on the clipboard, the user pastes (Ctrl+V, or the "Paste from clipboard"
+// button) or types the code into a multi-line text area, then presses Import. Decoding + preset creation live in ImportFromBuffer (Plugin.Marks.Share.cs).
 //
 // TextAreaElement is a fixed-height box (Lines rows) that wraps a long pasted code across several visible lines and
 // scrolls past that, so it never grows this auto-height window. It has NO submit: Enter inserts a newline (and keeps
@@ -45,11 +45,56 @@ public sealed partial class Plugin
             OnClose: () => _importWindow.SetVisible(false)));
     }
 
-    // Opening from hidden remounts with a fresh ZSeq, so it lands on top on its own — no BringToFront (Rule 5).
-    private void OpenImportWindow()
+    private const float ImportWidth = 420f;          // = DefaultRect width
+    private const float ImportHeightEstimate = 220f; // auto-height window; used until it has been mounted once
+    private const float ImportAnchorGap = 6f;
+    private WindowRect _importRect;                  // anchored rect, re-applied for a few frames after opening
+    private int _importRepositionTicks;
+
+    // Opens the paste window anchored to the "Import code…" button (`btn` = OnClickWithRect's rect). Opening from
+    // hidden remounts with a fresh ZSeq, so it lands on top on its own; if it is already visible it is only
+    // repositioned. Both windows are WindowCategory.Tools → no cross-category conflict → no BringToFront (Rule 5).
+    // DefaultRect stays constant (layout "reset" uses it).
+    private void OpenImportWindowAt(WindowRect btn)
     {
-        SetImportStatus("", ok: true);
+        SetImportStatus("", ok: true);   // keep the buffer — a half-pasted code survives an accidental close
+        _importRect = AnchorImportRect(btn);
         _importWindow.SetVisible(true);
+        _importWindow.SetRect(_importRect);
+        // First-ever open MOUNTS the window and the mount applies DefaultRect AFTER this SetRect, so it would land at
+        // the default spot. Re-assert the anchored rect for the next few ticks (TickImportReposition) —
+        // WindowBuilder-Patterns.md, "Click-to-open tooltip" first-open bug.
+        _importRepositionTicks = 4;
+    }
+
+    // OnClickWithRect reports SCREEN PIXELS (top-left origin), but WindowRect / SetRect / IWindowControl.Rect are
+    // CANVAS UNITS (anchoredPosition) — convert by the UI scale first, or the window drifts off the button whenever
+    // the UI scale ≠ 1. Canvas size falls back to screen size if the framework hasn't measured the canvas yet.
+    private WindowRect AnchorImportRect(WindowRect btn)
+    {
+        var fw = _services.Framework;
+        float cw = fw.CanvasWidth  > 0 ? fw.CanvasWidth  : fw.ScreenWidth;
+        float ch = fw.CanvasHeight > 0 ? fw.CanvasHeight : fw.ScreenHeight;
+        float px2cu = fw.ScreenWidth > 0 && cw > 0 ? cw / fw.ScreenWidth : 1f;
+
+        float bx = btn.X * px2cu, by = btn.Y * px2cu, bh = btn.Height * px2cu;
+        float h  = _importWindow.Rect.Height > 0f ? _importWindow.Rect.Height : ImportHeightEstimate;
+
+        // Just below the button, left-aligned to it; flip ABOVE the button when there is no room below.
+        float y = by + bh + ImportAnchorGap;
+        if (y + h > ch) y = by - ImportAnchorGap - h;
+        // Keep it fully on screen (SetRect clamps too, but keep the stashed rect honest for the re-apply ticks).
+        float x = Math.Max(0f, Math.Min(bx, cw - ImportWidth));
+        y = Math.Max(0f, Math.Min(y, ch - h));
+        return new WindowRect(x, y, ImportWidth, 0f);   // Height 0 = auto (not Resizable, so size is ignored anyway)
+    }
+
+    // Called every tick from TickMarks (Plugin.Marks.cs): re-assert the anchored rect for a few ticks after an open.
+    private void TickImportReposition()
+    {
+        if (_importRepositionTicks <= 0) return;
+        _importRepositionTicks--;
+        if (_importWindow.IsShown) _importWindow.SetRect(_importRect);
     }
 
     private void SetImportStatus(string text, bool ok)

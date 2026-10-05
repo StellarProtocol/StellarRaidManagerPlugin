@@ -141,9 +141,12 @@ public sealed partial class Plugin
     }
 
     // ── UI pieces (slotted into BuildMarksRoot) ──────────────────────────────────────────────────────────────────
-    // Full-width button under the create row — opens the paste window (Plugin.Marks.ImportWindow.cs).
+    // Full-width button under the create row — opens the paste window (Plugin.Marks.ImportWindow.cs) anchored to this
+    // button. OnClick AND OnClickWithRect both fire on a click, so OnClick is a no-op and the open happens once, in
+    // the rect callback that knows where the button is.
     private HudElement BuildMarksImportButton()
-        => new ButtonElement(() => _loc.T("rm.marks.import"), OnClick: OpenImportWindow);
+        => new ButtonElement(() => _loc.T("rm.marks.import"), OnClick: () => { })
+           { OnClickWithRect = OpenImportWindowAt };
 
     // Own row in the step panel: Save Step / Delete Step already fill the 440 window in the longer locales
     // (e.g. fil "Tanggalin ang Hakbang"), so a third button there would squeeze/clip. The code box below only shows
