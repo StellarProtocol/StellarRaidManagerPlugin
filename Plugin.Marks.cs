@@ -42,6 +42,8 @@ public sealed partial class Plugin
     private sealed class MarkStep
     {
         public List<MarkPos> Marks { get; set; } = new();
+        // Optional free-text note (Plugin.Marks.StepComment.cs). Absent in old configs → stays "".
+        public string Comment { get; set; } = "";
     }
 
     private sealed class MarkPreset
@@ -90,6 +92,8 @@ public sealed partial class Plugin
         _trashPng = BuildTrashIconPng();   // Plugin.TrashIcon.cs — per-row Delete button icon
         LoadPresetsFromConfig();
         RegisterMarksWindow();   // Plugin.Marks.Ui.cs
+        RegisterImportWindow();  // Plugin.Marks.ImportWindow.cs — share-code paste window
+        RegisterExportWindow();  // Plugin.Marks.ExportWindow.cs — share-code copy window
 
         // Step navigation from the keyboard — usable mid-fight without opening the window. Each op guards on
         // "no active preset" itself (see PrevStep/ResetSteps/NextStep), so a stray press just shows an error tip.
@@ -112,6 +116,8 @@ public sealed partial class Plugin
         _resetHotkey?.Dispose();
         _nextHotkey?.Dispose();
         _marksWindow?.Remove();
+        _importWindow?.Remove();
+        _exportWindow?.Remove();
     }
 
     // ── NoticeTip feedback (subtle, on-screen — mirrors the window status line) ────────────────────────────────────
@@ -150,15 +156,24 @@ public sealed partial class Plugin
 
     // Localized "resulting step" line for a nav op. Step 0 (the blank anchor) reads "Start"; a real step k reads
     // "Step k / N" where N == the real step count (Steps[0] is the anchor, so N = Steps.Count - 1).
+    // A non-empty step comment is appended (notice.stepComment) so it shows mid-fight from the hotkeys too.
     private string MarksStepNotice(MarkPreset p)
-        => _currentStep <= 0
-            ? _loc.TFormat("rm.marks.notice.start", p.Name)
+    {
+        if (_currentStep <= 0) return _loc.TFormat("rm.marks.notice.start", p.Name);
+        string c = _currentStep < p.Steps.Count ? p.Steps[_currentStep].Comment ?? "" : "";
+        return c.Length > 0
+            ? _loc.TFormat("rm.marks.notice.stepComment", p.Name, _currentStep, p.Steps.Count - 1, c)
             : _loc.TFormat("rm.marks.notice.step", p.Name, _currentStep, p.Steps.Count - 1);
+    }
 
     // Pumped from OnUpdate (Plugin.Logic.cs). Drains the load queue one mark per frame — Framework.Update runs on
     // the main thread before LateUpdate, which is exactly the timing the indicatorPos_ write needs.
     private void TickMarks(float deltaTime)
     {
+        // First-open anchor re-apply for the share-code popups (Plugin.Marks.ImportWindow.cs / .ExportWindow.cs).
+        TickPopupReposition(_importWindow, _importRect, ref _importRepositionTicks);
+        TickPopupReposition(_exportWindow, _exportRect, ref _exportRepositionTicks);
+
         if (_loadQueue.Count > 0)
         {
             var m = _loadQueue.Dequeue();
@@ -206,6 +221,8 @@ public sealed partial class Plugin
 
         // Every preset owns a permanent blank Step 0 (the "Start" anchor); real layouts are appended as steps 1..N.
         _presets.Add(new MarkPreset { Name = name, Steps = { new MarkStep() } });
+        _editingIdx = -1;   // list changed — drop any in-progress rename (it is keyed by index)
+        CancelStepCommentEdit();
         _newPresetName = "";
         SavePresetsToConfig();
         _marksStatus = _loc.TFormat("rm.marks.created", name);
@@ -217,6 +234,8 @@ public sealed partial class Plugin
     private void ActivatePreset(int index)
     {
         if (index < 0 || index >= _presets.Count) return;
+        CancelStepCommentEdit();   // preset switch — a step-comment edit belongs to the old preset
+        ClearExportCode();         // share code belongs to the old preset (Plugin.Marks.Share.cs)
         _activeIndex = index;
         _currentStep = 0;   // land on the blank Start anchor; pure selection — do NOT apply/place anything
         SavePresetsToConfig();   // also persists the active-preset name
@@ -234,6 +253,8 @@ public sealed partial class Plugin
         var p = ActivePreset();
         if (p == null) return;          // nothing active — guard (button only shows "Deactivate" when one is active)
         string name = p.Name;
+        CancelStepCommentEdit();
+        ClearExportCode();
         _activeIndex = -1;
         _currentStep = -1;              // nothing applied yet (matches the no-active-preset load state)
         SavePresetsToConfig();          // persists the cleared active-preset name (stays deactivated on relaunch)
@@ -247,6 +268,9 @@ public sealed partial class Plugin
         if (index < 0 || index >= _presets.Count) return;
         string name = _presets[index].Name;
         _presets.RemoveAt(index);
+        _editingIdx = -1;   // indices shifted — an in-progress rename would now point at the wrong row
+        CancelStepCommentEdit();
+        ClearExportCode();  // _exportPresetIdx is an index too — shifted/removed along with the list
 
         // Keep _activeIndex pointing at the same preset it did before (or clear it if that one was removed).
         if (_activeIndex == index) { _activeIndex = -1; _currentStep = -1; }
@@ -272,6 +296,8 @@ public sealed partial class Plugin
             return;
         }
 
+        CancelStepCommentEdit();   // cursor is about to jump to the new step
+        ClearExportCode();         // new step → any exported code is stale
         // Always append (never overwrite Step 0). New index >= 1 == the real step number (Steps[0] is the anchor).
         p.Steps.Add(new MarkStep { Marks = marks });
         _currentStep = p.Steps.Count - 1;   // cursor lands on the freshly-added step
@@ -285,6 +311,7 @@ public sealed partial class Plugin
     {
         var p = ActivePreset();
         if (p == null) { ShowMarksError(_loc.T("rm.marks.notice.noActive")); return; }
+        CancelStepCommentEdit();
         // Advance 0→1→…→N (N == last real step); Steps[0] is the anchor so Steps is never empty.
         if (_currentStep < p.Steps.Count - 1) { _currentStep++; ApplyStep(_currentStep); }
         // Tip reflects the RESULTING step even when clamped at the end (just re-shows the current step).
@@ -295,6 +322,7 @@ public sealed partial class Plugin
     {
         var p = ActivePreset();
         if (p == null) { ShowMarksError(_loc.T("rm.marks.notice.noActive")); return; }
+        CancelStepCommentEdit();
         // Step back toward 0; landing on Step 0 (the blank anchor) clears the board.
         if (_currentStep > 0) { _currentStep--; ApplyStep(_currentStep); }
         // Tip reflects the RESULTING step even when clamped at Start (just re-shows Step 0).
@@ -305,6 +333,7 @@ public sealed partial class Plugin
     {
         var p = ActivePreset();
         if (p == null) { ShowMarksError(_loc.T("rm.marks.notice.noActive")); return; }
+        CancelStepCommentEdit();
         // Reset = go to the blank Start anchor and apply it → clears the board (Steps[0] is always empty).
         _currentStep = 0;
         ApplyStep(0);
@@ -323,7 +352,9 @@ public sealed partial class Plugin
         }
         if (_currentStep >= p.Steps.Count) return;   // out of range (shouldn't happen) — nothing to delete
 
-        int shown = _currentStep;                    // real step number == index (Steps[0] is the anchor)
+        CancelStepCommentEdit();
+        ClearExportCode();                           // step removed → any exported code is stale
+        int shown = _currentStep;                   // real step number == index (Steps[0] is the anchor)
         p.Steps.RemoveAt(_currentStep);
         if (_currentStep >= p.Steps.Count) _currentStep = p.Steps.Count - 1;   // clamp; falls back to 0 (anchor)
 
@@ -377,6 +408,11 @@ public sealed partial class Plugin
             foreach (var p in _presets)
                 if (p.Steps.Count == 0 || p.Steps[0].Marks.Count > 0)
                     p.Steps.Insert(0, new MarkStep());
+
+            // A step with an explicit JSON null comment would otherwise carry null past the initializer.
+            foreach (var p in _presets)
+                foreach (var st in p.Steps)
+                    st.Comment ??= "";
 
             // Resolve the persisted active name back to an index; the cursor lands on Step 0 (the blank anchor).
             string active = _marksCfg.Get<string>("active", "") ?? "";

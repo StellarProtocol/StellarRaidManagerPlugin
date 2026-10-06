@@ -17,7 +17,9 @@ Save the dungeon markers you place and reload the whole layout in one click — 
 
 - **Save a layout as a step** — place your markers, then *Save Step*. A preset is an ordered list of steps (one marker layout per phase).
 - **Walk the sequence during the fight** — *Previous / Reset / Next* each clears the board and places that step's markers. Step 0 is a permanent blank "Start".
-- **A preset per raid** — create and name as many as you like; *Activate* the one you're running (the button toggles to *Deactivate*).
+- **A preset per raid** — create and name as many as you like; *Activate* the one you're running (the button toggles to *Deactivate*). Rename a preset any time with its pencil button.
+- **Step notes** — give each step a short comment (e.g. "P2 — stack west"); it shows in the window and in the pop-up when you step to it.
+- **Share presets** — *Export Preset* gives a short code (with a Copy button) holding the whole preset: name, every step's markers and notes. A friend pastes it into *Import Preset* to get the same preset.
 - Pop-up confirmations on each change, and **Previous / Reset / Next hotkeys** (unbound by default — assign your own in the game's key settings).
 
 Open it from **Raid Manager → Mark Presets**. Marker placement works in dungeons.
@@ -64,7 +66,7 @@ Open **Raid Manager** from the PLUGINS launcher tile (⚔ icon).
 
 ## Requirements
 
-- Stellar Mod System **v1.3.0 or above**
+- Stellar Mod System **v2.19.0 or above**
 
 ## Installation
 

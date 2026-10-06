@@ -1,6 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="$(MSBuildThisFileDirectory)Local.props" Condition="Exists('$(MSBuildThisFileDirectory)Local.props')" />
-
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -9,12 +7,15 @@
     <NoWarn>CS8632;CS8765</NoWarn>
     <RootNamespace>Stellar.RaidManager</RootNamespace>
     <AssemblyName>Stellar.RaidManager</AssemblyName>
-    <Version>2.2.0</Version>
+    <Version>2.3.0</Version>
     <Deterministic>true</Deterministic>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources/raid-manager-icon.png" LogicalName="Stellar.RaidManager.raid-manager-icon.png" />
+    <!-- Rename edit/save chip icons, copied from StellarWardrobeLoadout/Icons (explicit LogicalName = stable manifest name). -->
+    <EmbeddedResource Include="Icons/edit.png" LogicalName="Stellar.RaidManager.Icons.edit.png" />
+    <EmbeddedResource Include="Icons/save.png" LogicalName="Stellar.RaidManager.Icons.save.png" />
     <EmbeddedResource Include="Lang/en.json" LogicalName="Stellar.RaidManager.Lang.en.json" />
     <EmbeddedResource Include="Lang/ja.json" LogicalName="Stellar.RaidManager.Lang.ja.json" />
     <EmbeddedResource Include="Lang/th.json" LogicalName="Stellar.RaidManager.Lang.th.json" />
@@ -23,10 +24,14 @@
   </ItemGroup>
   <ItemGroup>
     <!-- i18n P2: consumes IPluginServices.Localization (framework 2.1.0). -->
-    <PackageReference Include="Stellar.Abstractions" Version="2.3.0" />
-    <PackageReference Include="Stellar.PluginContracts" Version="2.0.0" />
-    <PackageReference Include="Stellar.Plugin.InteropRefs" Version="2.0.0" />
+    <PackageReference Include="Stellar.Abstractions" Version="2.19.1" />
+    <PackageReference Include="Stellar.PluginContracts" Version="2.19.1" />
+    <PackageReference Include="Stellar.Plugin.InteropRefs" Version="2.19.1" />
   </ItemGroup>
+  <!-- Local overrides: deploy target, game paths, and (while unreleased) a local Stellar.Abstractions
+       reference that carries InputElement.SingleLine — all in Local.props (gitignored). Imported AFTER the
+       PackageReferences so a `PackageReference Remove` in Local.props can take effect. -->
+  <Import Project="$(MSBuildThisFileDirectory)Local.props" Condition="Exists('$(MSBuildThisFileDirectory)Local.props')" />
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
   </ItemGroup>
