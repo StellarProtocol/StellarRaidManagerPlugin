@@ -15,7 +15,7 @@ namespace Stellar.RaidManager;
 // The tracker must be polling for occurrences to fire — it runs while the list OR the minimap OR alerts are enabled.
 public sealed partial class Plugin
 {
-    private IWindowControl  _mechAlertHud = null!;
+    private IWindowControl? _mechAlertHud;          // null while removed (alert toggle off)
     private MechAudioPlayer? _mechAudio;           // created on the first chime (its thread costs nothing until then)
 
     private bool  _alertOn, _alertSound = true;     // on-me alert default OFF (opt-in, like the list and minimap)
@@ -32,7 +32,7 @@ public sealed partial class Plugin
         _alertScale  = Math.Clamp(_cfg.Get<float>("mech_alert_scale", 1.5f), 1f, 6f);
 
         _mechTracker.Occurrence += OnMechOccurrence;
-        RegisterMechAlertHud();   // Plugin.MechanicAlerts.Banner.cs
+        if (_alertOn) RegisterMechAlertHud();   // Plugin.MechanicAlerts.Banner.cs; off ⇒ never registered
     }
 
     private void DisposeMechanicAlerts()
@@ -86,7 +86,7 @@ public sealed partial class Plugin
         MechIndent(
             MechToggleRow("rm.mech.alert.enable", () => _alertOn, v =>
             {
-                _alertOn = v; SetMechBool("mech_alert_on", v); ApplyMechTrackerEnabled();
+                _alertOn = v; SetMechBool("mech_alert_on", v); ApplyMechHudWindows(); ApplyMechTrackerEnabled();
             }),
             // Sound / volume / size / test only while the on-me alert is on (hidden otherwise).
             new ConditionalElement(() => _alertOn, MechIndent(

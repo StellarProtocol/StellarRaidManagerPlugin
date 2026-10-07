@@ -24,7 +24,7 @@ namespace Stellar.RaidManager;
 //     framework restores its saved position) once the slider has been still for 300 ms (debounced, not per drag tick).
 public sealed partial class Plugin
 {
-    private IWindowControl _mechHudWindow = null!;
+    private IWindowControl? _mechHudWindow;          // null while removed (list toggle off — ApplyMechHudWindows)
     private const int MechHudSlots = 16;   // headers + rows; upstream panels rarely list more than a handful
 
     // Width-resizable: Resizable turns OFF the Borderless content-fit on BOTH axes and fixes the height (no width-only
@@ -110,8 +110,10 @@ public sealed partial class Plugin
         if (Environment.TickCount64 < _mechHudRebuildAt) return;
         _mechHudRebuildTick?.Dispose(); _mechHudRebuildTick = null;
         if (MathF.Abs(_mechHudScale - _mechHudBuiltScale) < 0.001f) return;
-        _mechWindows.Remove(_mechHudWindow);
-        _mechHudWindow.Remove();
+        // List turned off inside the debounce ⇒ the window is already removed; don't resurrect it (it is rebuilt at the
+        // current scale when the toggle comes back on).
+        if (_mechHudWindow == null) return;
+        RemoveMechHud(ref _mechHudWindow);
         RegisterMechCalloutHud();   // same id → saved position restored
     }
 

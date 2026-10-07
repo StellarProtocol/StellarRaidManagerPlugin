@@ -15,7 +15,7 @@ namespace Stellar.RaidManager;
 public sealed partial class Plugin
 {
     private const int MechMapPx = 300;                     // texture AND on-screen size (1:1 texels → crisp)
-    private IWindowControl         _mechMapWindow = null!;
+    private IWindowControl?        _mechMapWindow;       // null while removed (map toggle off)
     private MechanicMinimapPainter _mechMapPainter = null!;
     private bool _mechMapEnabled;
     private bool _mechMapMarkers = true;                   // "Show party markers" (default ON)
@@ -31,7 +31,11 @@ public sealed partial class Plugin
         _mechMapFloor = _cfg.Get<bool>("mech_map_floor", true);
         _mechMapPainter = new MechanicMinimapPainter(MechMapPx);
         ApplyMechMapOptions();
+        if (_mechMapEnabled) RegisterMechMapHud();   // off ⇒ never registered (not even in the layout editor)
+    }
 
+    private void RegisterMechMapHud()
+    {
         _mechMapWindow = _services.Windows.Register(new WindowRegistration(
             Spec: new WindowSpec(
                 Id:          "raidmanager.mech.map",

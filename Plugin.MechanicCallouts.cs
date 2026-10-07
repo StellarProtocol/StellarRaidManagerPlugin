@@ -57,7 +57,7 @@ public sealed partial class Plugin
         _mechWindows.Add(_mechWindow);
 
         _mechHudScale = Math.Clamp(_cfg.Get<float>("mech_textscale", 1f), 0.75f, 2f);   // callout list "Text size"
-        RegisterMechCalloutHud();   // Plugin.MechanicCalloutsHud.cs
+        if (_mechEnabled) RegisterMechCalloutHud();   // Plugin.MechanicCalloutsHud.cs; off ⇒ never registered
         InitMechanicMinimap();      // Plugin.MechanicMinimap.cs (own toggles + HUD window)
         InitMechanicAlerts();       // Plugin.MechanicAlerts.cs (on-me banner + chime)
 
@@ -85,6 +85,26 @@ public sealed partial class Plugin
         SetMechMapTick(_mechMapEnabled);   // per-frame smooth-dot tick only while the map is on
     }
 
+    // A HUD window EXISTS only while its own toggle is on; off ⇒ REMOVED, not hidden: the layout editor lists every
+    // EditModeDragOnly window that isn't Removed — hidden ones too, as a dimmed "re-enable" outline (framework
+    // WindowService.EditableElements) — so ShouldRender=false alone still showed a turned-off HUD there. Back on ⇒
+    // re-registered with the SAME id, so its saved layout position comes back. Removed windows leave _mechWindows, so
+    // dispose never removes them twice. Called from the three HUD toggles (after init only).
+    private void ApplyMechHudWindows()
+    {
+        if (!_mechEnabled)    RemoveMechHud(ref _mechHudWindow); else if (_mechHudWindow == null) RegisterMechCalloutHud();
+        if (!_mechMapEnabled) RemoveMechHud(ref _mechMapWindow); else if (_mechMapWindow == null) RegisterMechMapHud();
+        if (!_alertOn)        RemoveMechHud(ref _mechAlertHud);  else if (_mechAlertHud == null)  RegisterMechAlertHud();
+    }
+
+    private void RemoveMechHud(ref IWindowControl? w)
+    {
+        if (w == null) return;
+        _mechWindows.Remove(w);
+        w.Remove();
+        w = null;
+    }
+
     private void SetMechBool(string key, bool v)
     {
         _cfg.Set<bool>(key, v);
@@ -107,6 +127,7 @@ public sealed partial class Plugin
             MechToggleRow("rm.mech.list.enable", () => _mechEnabled, v =>
             {
                 _mechEnabled = v;
+                ApplyMechHudWindows();
                 ApplyMechTrackerEnabled();
                 SetMechBool("mech_enabled", v);
             }),
@@ -135,6 +156,7 @@ public sealed partial class Plugin
             MechToggleRow("rm.mech.map.enable", () => _mechMapEnabled, v =>
             {
                 _mechMapEnabled = v;
+                ApplyMechHudWindows();
                 ApplyMechTrackerEnabled();
                 SetMechBool("mech_map_enabled", v);
             }),
