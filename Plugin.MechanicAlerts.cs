@@ -84,24 +84,27 @@ public sealed partial class Plugin
     {
         new TextElement(() => _loc.T("rm.mech.alert.title"), Emphasis: true),
         new TextElement(() => _loc.T("rm.mech.alert.help"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-        MechToggleRow("rm.mech.alert.enable", () => _alertOn, v =>
-        {
-            _alertOn = v; SetMechBool("mech_alert_on", v); ApplyMechTrackerEnabled();
-        }),
-        MechToggleRow("rm.mech.alert.sound", () => _alertSound, v => { _alertSound = v; SetMechBool("mech_alert_sound", v); }),
-        MechSliderRow("rm.mech.alert.volume", () => _alertVolume, v =>
-        {
-            _alertVolume = v;
-            _cfg.Set<float>("mech_alert_volume", _alertVolume); _cfg.Save();
-        }, 0f, 1f, () => $"{_alertVolume * 100f:0}%"),
-        MechSliderRow("rm.mech.alert.size", () => _alertScale, v =>
-        {
-            _alertScale = Math.Clamp(MathF.Round(v * 2f) / 2f, 1f, 6f);   // 0.5 steps
-            _cfg.Set<float>("mech_alert_scale", _alertScale); _cfg.Save();
-        }, 1f, 6f, () => $"{_alertScale:0.0}x"),
-        new RowElement(new HudElement[]
-        {
-            new ButtonElement(() => _loc.T("rm.mech.alert.test"), OnClick: TestOnMeAlert),
-        }, Gap: 8f),
+        MechIndent(
+            MechToggleRow("rm.mech.alert.enable", () => _alertOn, v =>
+            {
+                _alertOn = v; SetMechBool("mech_alert_on", v); ApplyMechTrackerEnabled();
+            }),
+            // Sound / volume / size / test only while the on-me alert is on (hidden otherwise).
+            new ConditionalElement(() => _alertOn, MechIndent(
+                MechToggleRow("rm.mech.alert.sound", () => _alertSound, v => { _alertSound = v; SetMechBool("mech_alert_sound", v); }),
+                MechSliderRow("rm.mech.alert.volume", () => _alertVolume, v =>
+                {
+                    _alertVolume = v;
+                    _cfg.Set<float>("mech_alert_volume", _alertVolume); _cfg.Save();
+                }, 0f, 1f, () => $"{_alertVolume * 100f:0}%"),
+                MechSliderRow("rm.mech.alert.size", () => _alertScale, v =>
+                {
+                    _alertScale = Math.Clamp(MathF.Round(v * 2f) / 2f, 1f, 6f);   // 0.5 steps
+                    _cfg.Set<float>("mech_alert_scale", _alertScale); _cfg.Save();
+                }, 1f, 6f, () => $"{_alertScale:0.0}x"),
+                new RowElement(new HudElement[]
+                {
+                    new ButtonElement(() => _loc.T("rm.mech.alert.test"), OnClick: TestOnMeAlert),
+                }, Gap: 8f)))),
     }, Gap: 8f);
 }

@@ -41,7 +41,7 @@ public sealed partial class Plugin
             Spec: new WindowSpec(
                 Id: "raidmanager.mech.settings",
                 Title: _loc.T("rm.mech.title"),
-                DefaultRect: new WindowRect(960f, 240f, 460f, 0f),
+                DefaultRect: new WindowRect(960f, 240f, 480f, 0f),
                 Category: WindowCategory.Tools,
                 Style: WindowPanelStyle.GlassMenu)
             {
@@ -85,44 +85,67 @@ public sealed partial class Plugin
         _cfg.Save();
     }
 
+    // Three sections in the Mark Presets style (Emphasis header + separator between sections). Each section's master
+    // toggle is indented one level under its header; sub-options sit one level deeper and are HIDDEN (not greyed)
+    // while the master is off — ConditionalElement drops them and the auto-height GlassMenu shrinks to fit.
     private HudElement BuildMechCalloutRoot() => new ColumnElement(new HudElement[]
     {
         new TextElement(() => _loc.T("rm.mech.title"), Emphasis: true),
         new TextElement(() => _loc.T("rm.mech.intro"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-        MechToggleRow("rm.mech.list.enable", () => _mechEnabled, v =>
+        new TextElement(() => _loc.T("rm.mech.help"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
+        new SeparatorElement(),
+
+        // ── Callout List ──
+        new TextElement(() => _loc.T("rm.mech.list.title"), Emphasis: true),
+        MechIndent(MechToggleRow("rm.mech.list.enable", () => _mechEnabled, v =>
         {
             _mechEnabled = v;
             ApplyMechTrackerEnabled();
             SetMechBool("mech_enabled", v);
-        }),
-        MechToggleRow("rm.mech.map.enable", () => _mechMapEnabled, v =>
-        {
-            _mechMapEnabled = v;
-            ApplyMechTrackerEnabled();
-            SetMechBool("mech_map_enabled", v);
-        }),
-        MechToggleRow("rm.mech.map.markers", () => _mechMapMarkers, v =>
-        {
-            _mechMapMarkers = v;
-            ApplyMechMapOptions();
-            SetMechBool("mech_map_markers", v);
-        }),
-        MechToggleRow("rm.mech.map.hideNormal", () => _mechMapHideNormal, v =>
-        {
-            _mechMapHideNormal = v;
-            ApplyMechMapOptions();
-            SetMechBool("mech_map_hidenormal", v);
-        }),
-        MechToggleRow("rm.mech.map.floor", () => _mechMapFloor, v =>
-        {
-            _mechMapFloor = v;
-            ApplyMechMapOptions();
-            SetMechBool("mech_map_floor", v);
-        }),
-        new TextElement(() => _loc.T("rm.mech.help"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
+        })),
         new SeparatorElement(),
+
+        // ── Minimap ──
+        new TextElement(() => _loc.T("rm.mech.map.title"), Emphasis: true),
+        MechIndent(
+            MechToggleRow("rm.mech.map.enable", () => _mechMapEnabled, v =>
+            {
+                _mechMapEnabled = v;
+                ApplyMechTrackerEnabled();
+                SetMechBool("mech_map_enabled", v);
+            }),
+            new ConditionalElement(() => _mechMapEnabled, MechIndent(
+                MechToggleRow("rm.mech.map.markers", () => _mechMapMarkers, v =>
+                {
+                    _mechMapMarkers = v;
+                    ApplyMechMapOptions();
+                    SetMechBool("mech_map_markers", v);
+                }),
+                MechToggleRow("rm.mech.map.hideNormal", () => _mechMapHideNormal, v =>
+                {
+                    _mechMapHideNormal = v;
+                    ApplyMechMapOptions();
+                    SetMechBool("mech_map_hidenormal", v);
+                }),
+                MechToggleRow("rm.mech.map.floor", () => _mechMapFloor, v =>
+                {
+                    _mechMapFloor = v;
+                    ApplyMechMapOptions();
+                    SetMechBool("mech_map_floor", v);
+                })))),
+        new SeparatorElement(),
+
+        // ── Mechanic Alerts ──
         BuildMechAlertSection(),    // Plugin.MechanicAlerts.cs — "Mechanic Alerts" in this same menu
     }, Gap: 8f);
+
+    // One indentation level: a fixed spacer (12 + the 6 px row gap = 18 px) before a stretching column, so nested
+    // rows (incl. sliders, which need the leftover width) still fill the window.
+    private static HudElement MechIndent(params HudElement[] children) => new RowElement(new HudElement[]
+    {
+        new SpacerElement(Width: 12f, Height: 0f),
+        new CellElement(new ColumnElement(children, Gap: 8f), Weight: 1f),
+    }, Gap: 6f);
 
     // Capsule toggle + sibling label (ToggleElement is capsule-only — same row shape as Plugin.Settings.cs).
     private HudElement MechToggleRow(string labelKey, Func<bool> get, Action<bool> set) =>
