@@ -131,14 +131,38 @@ internal sealed class MechanicMinimapPainter : IDisposable
         if (reg.Kind == MinimapRegionKind.Ring)
         {
             var (ox, oy) = L(0, 0);
-            _r.FillAnnulus(ox, oy, reg.RInner * _scale, reg.ROuter * _scale, c, 0.18f);
-            _r.StrokeCircle(ox, oy, reg.ROuter * _scale, K(1.5f), c, 0.9f);
+            float ri = reg.RInner * _scale, ro = reg.ROuter * _scale;
+            if (reg.Style == 3)
+            {
+                // Raid ring DANGER band (the two rings spawned in a wave): strong red fill + heavy red edges.
+                var red = MechanicCalloutData.SlotColor(3);
+                _r.FillAnnulus(ox, oy, ri, ro, red, 0.35f);
+                if (ri > 0f) _r.StrokeCircle(ox, oy, ri, K(2.5f), red, 1f);
+                _r.StrokeCircle(ox, oy, ro, K(2.5f), red, 1f);
+                return;
+            }
+            if (reg.Style == 1)
+            {
+                // Raid ring SAFE band: calm pale-mint outline only (no fill), so it never reads as a hazard.
+                if (ri > 0f) _r.StrokeCircle(ox, oy, ri, K(1.5f), CheckC, 0.95f);
+                _r.StrokeCircle(ox, oy, ro, K(1.5f), CheckC, 0.95f);
+                return;
+            }
+            _r.FillAnnulus(ox, oy, ri, ro, c, 0.18f);
+            _r.StrokeCircle(ox, oy, ro, K(1.5f), c, 0.9f);
             return;
         }
         if (reg.Kind == MinimapRegionKind.Sector)  { DrawSector(reg, c);  return; }
         if (reg.Kind == MinimapRegionKind.Polygon) { DrawPolygon(reg, c); return; }
         if (reg.Kind == MinimapRegionKind.Line)    { DrawLineRegion(reg, c); return; }
         if (reg.Kind == MinimapRegionKind.Crystal) { DrawCrystal(reg); return; }
+        if (reg.Kind == MinimapRegionKind.Text)
+        {
+            // Arena-local label (raid ring step numbers): white, dark-outlined, same size as the tile labels.
+            var (lx, ly) = L(reg.X, reg.Z);
+            if (!string.IsNullOrEmpty(reg.Label)) _r.Text(reg.Label!, lx, ly, K(4f), White, outline: true);
+            return;
+        }
         var (ax, ay) = P(reg.X - reg.HalfX, reg.Z - reg.HalfZ);
         var (bx, by) = P(reg.X + reg.HalfX, reg.Z + reg.HalfZ);
         if (reg.Style != 0) { DrawFloorCell(reg.Style, ax, ay, bx, by); return; }

@@ -33,7 +33,7 @@ internal sealed class MinimapView
 }
 
 // Upstream MechanicRegion kinds: rect / ring / sector / polygon / line.
-internal enum MinimapRegionKind { Rect, Ring, Sector, Polygon, Line, Crystal }   // Crystal = raid Preset Return crystal glyph (point)
+internal enum MinimapRegionKind { Rect, Ring, Sector, Polygon, Line, Crystal, Text }   // Crystal = raid Preset Return crystal glyph (point); Text = label at an ARENA-LOCAL point
 
 internal struct MinimapRegion
 {
@@ -49,6 +49,7 @@ internal struct MinimapRegion
                                        //       3 = DANGER no-go tile (red fill + hazard stripes + heavy outline; Phase Mapping / Explosions)
                                        //       4 = Preset Return crystal PRESSED on this tile (grey tint + check mark, label-safe)
                                        // Crystal: 1 = pressed but still present (dimmed glyph)
+                                       // Ring:    3 = raid ring DANGER band (red fill + heavy edges), 1 = SAFE band (calm outline only)
 
     public static MinimapRegion Ring(float rInner, float rOuter, int color) =>
         new() { Kind = MinimapRegionKind.Ring, RInner = rInner, ROuter = rOuter, Color = color };
@@ -68,6 +69,11 @@ internal struct MinimapRegion
     // Raid Preset Return crystal at world x/z: a fixed-px painter glyph (size scales with the canvas, not the world).
     public static MinimapRegion Crystal(float x, float z, bool pressed) =>
         new() { Kind = MinimapRegionKind.Crystal, X = x, Z = z, Style = pressed ? 1 : 0 };
+
+    // A painter-font label (digits / 'F' / '?') at an ARENA-LOCAL x/z (around the origin, like Ring) — e.g. the raid
+    // ring step numbers drawn inside each preview wave's safe band.
+    public static MinimapRegion Text(float localX, float localZ, string label) =>
+        new() { Kind = MinimapRegionKind.Text, X = localX, Z = localZ, Label = label };
 }
 
 internal enum MinimapDotKind { Local, Teammate, Monster }
