@@ -16,9 +16,9 @@ namespace Stellar.RaidManager;
 public sealed partial class Plugin
 {
     private IWindowControl  _mechAlertHud = null!;
-    private MechAudioPlayer _mechAudio = null!;
+    private MechAudioPlayer? _mechAudio;           // created on the first chime (its thread costs nothing until then)
 
-    private bool  _alertOn = true, _alertSound = true;
+    private bool  _alertOn, _alertSound = true;     // on-me alert default OFF (opt-in, like the list and minimap)
     private float _alertVolume = 0.8f;
     private const long AlertUntimedMs = 5000;      // banner time for mechanics without a countdown (fixed)
 
@@ -26,12 +26,11 @@ public sealed partial class Plugin
 
     private void InitMechanicAlerts()
     {
-        _alertOn     = _cfg.Get<bool>("mech_alert_on", true);
+        _alertOn     = _cfg.Get<bool>("mech_alert_on", false);
         _alertSound  = _cfg.Get<bool>("mech_alert_sound", true);
         _alertVolume = Math.Clamp(_cfg.Get<float>("mech_alert_volume", 0.8f), 0f, 1f);
         _alertScale  = Math.Clamp(_cfg.Get<float>("mech_alert_scale", 1.5f), 1f, 6f);
 
-        _mechAudio = new MechAudioPlayer();
         _mechTracker.Occurrence += OnMechOccurrence;
         RegisterMechAlertHud();   // Plugin.MechanicAlerts.Banner.cs
     }
@@ -56,7 +55,7 @@ public sealed partial class Plugin
         if (_alertSound) PlayAlertSound();
     }
 
-    private void PlayAlertSound() => _mechAudio.PlayChime(_alertVolume);
+    private void PlayAlertSound() => (_mechAudio ??= new MechAudioPlayer()).PlayChime(_alertVolume);
 
     // Banner liveness: test by time; timed while its row is still active (same row object, timer > 0); untimed for
     // AlertUntimedMs (or until the row ends, if sooner).
