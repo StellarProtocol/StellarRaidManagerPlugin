@@ -11,6 +11,17 @@ namespace Stellar.RaidManager;
 // Renders only in-world, when enabled AND there are rows; in layout-edit mode (enabled) it shows sample rows to
 // position (the only preview path). No BringToFront: it opens from hidden via ShouldRender and lands on top within its ZCat
 // naturally (CLAUDE.md rule 5).
+//
+// TEXT SIZE ("Text size" slider, config mech_textscale, 0.75–2.0×, default 1.0×) scales everything in the list: header /
+// label / timer / names fonts, the colour swatch, row stride, column widths (label 300, timer, gaps) and the window's
+// width, min width and locked height. Two halves:
+//   • fonts: Surface = HudOverlay — the only surface that honours FontSize/DynamicFontSize (a Menu-surface TextElement
+//     ignores FontSize, WindowBuilder-Patterns.md) — with DynamicFontSize re-read every refresh, so text follows the
+//     slider LIVE. No Emphasis on these changing texts (it clobbers DynamicFontSize on HudOverlay); HudOverlay also
+//     ignores Bold, so the group header is bold via an inline <b> rich-text tag.
+//   • geometry: column widths, swatch size and the Resizable window's MinHeight==MaxHeight lock are baked at
+//     registration and can't change at runtime → the window is REMOVED and RE-REGISTERED with the same id (the
+//     framework restores its saved position) once the slider has been still for 300 ms (debounced, not per drag tick).
 public sealed partial class Plugin
 {
     private IWindowControl _mechHudWindow = null!;
@@ -21,25 +32,39 @@ public sealed partial class Plugin
     // every slot at ~21f stride + room for ~6 wrapped name lines. It must not be too SHORT — under-height, the root
     // VLG squeezes children toward their minHeight (Text min = 0) and rows overlap; extra height is just empty space
     // below the top-stacked rows (root VLG is UpperLeft, childForceExpandHeight off).
+    // Sizes at Text size 1.0× (canvas units); every one but the outer padding is multiplied by the scale.
     private const float MechHudPad = 20f /* column only — Passive root has none */, MechHudStride = 21f, MechHudWrapReserve = 6 * 18f;
-    private const float MechHudH = 2 * MechHudPad + MechHudSlots * MechHudStride + MechHudWrapReserve;   // = 484
     private const float MechHudLabelW = 300f;   // mechanic-name column (was 230; long th/fil names)
+    private const float MechHudTimerW = 48f, MechHudSwatchCell = 14f, MechHudSwatch = 10f, MechHudBreak = 4f, MechHudGap = 6f;
     private const float MechHudMinW = 550f, MechHudMaxW = 1200f;   // +70 with the label column: timer + names keep their width
+    private const int   MechHudFont = 14, MechHudHeaderFont = 15;  // the Menu surface's own body / emphasis sizes
+
+    private float _mechHudScale = 1f;          // live "Text size" (fonts follow it at once)
+    private float _mechHudBuiltScale = 1f;     // scale the window geometry was registered with
+    private long  _mechHudRebuildAt;           // debounce deadline for the geometry re-register (0 = none pending)
+    private IDisposable? _mechHudRebuildTick;
+
+    private float MechHudH(float s) => 2 * MechHudPad + (MechHudSlots * MechHudStride + MechHudWrapReserve) * s;
+    private float MechHudMinWidth(float s) => 2 * MechHudPad + (MechHudMinW - 2 * MechHudPad) * s;
+    private int   MechFont(int basePx) => Math.Max(1, (int)MathF.Round(basePx * _mechHudScale));
 
     private void RegisterMechCalloutHud()
     {
+        float s = _mechHudBuiltScale = _mechHudScale;
+        float minW = MechHudMinWidth(s), h = MechHudH(s);
         _mechHudWindow = _services.Windows.Register(new WindowRegistration(
             Spec: new WindowSpec(
                 Id:          "raidmanager.mech.hud",
                 Title:       _loc.T("rm.mech.hud.list"),
                 // Constant 1440p-calibrated rect (never ScreenWidth-derived — "reset all HUD" reads ScreenWidth 0).
-                DefaultRect: new WindowRect(40f, 420f, MechHudMinW, MechHudH),
+                DefaultRect: new WindowRect(40f, 420f, minW, h),
                 Category:    WindowCategory.HUD,
                 Style:       WindowPanelStyle.Borderless)
             {
                 Draggable = true, EditModeDragOnly = true, Closable = false, StartVisible = false,
+                Surface = SurfaceStyle.HudOverlay,   // live DynamicFontSize (Text size)
                 // Extra width goes only to the names column (the one Weight cell); swatch/label/timer are fixed.
-                Resizable = true, MinWidth = MechHudMinW, MaxWidth = MechHudMaxW, MinHeight = MechHudH, MaxHeight = MechHudH,
+                Resizable = true, MinWidth = minW, MaxWidth = MathF.Max(MechHudMaxW, minW), MinHeight = h, MaxHeight = h,
                 // Passive: the Borderless root carries a full-rect invisible raycast blocker, and with the locked tall
                 // height most of it is EMPTY — it would eat game clicks/camera drags over a big blank area mid-fight.
                 // Passive drops that blocker (pure info HUD, nothing clickable). Edit-mode drag/resize hit-test rects
@@ -51,7 +76,7 @@ public sealed partial class Plugin
                                   && (_services.ClientState.UiState & GameUIState.Blocking) == 0
                                   && (_services.Windows.IsLayoutEditing || _mechTracker.RowCount > 0),
             },
-            Root:    BuildMechHudRoot(),
+            Root:    BuildMechHudRoot(s),
             OnClose: () => { }));
         _mechWindows.Add(_mechHudWindow);   // DisposeMechanicCallouts Remove()s each
         _mechHudWindow.SetVisible(true);   // always "shown"; ShouldRender does the real gating
@@ -70,38 +95,63 @@ public sealed partial class Plugin
         return i < lines.Count ? lines[i] : null;
     }
 
-    private HudElement BuildMechHudRoot()
+    // Text size changed: fonts follow at once; the geometry re-register waits until the slider is still for 300 ms.
+    private void SetMechHudScale(float v)
+    {
+        _mechHudScale = Math.Clamp(MathF.Round(v * 20f) / 20f, 0.75f, 2f);   // 0.05 steps
+        _cfg.Set<float>("mech_textscale", _mechHudScale);
+        _cfg.Save();
+        _mechHudRebuildAt = Environment.TickCount64 + 300;
+        _mechHudRebuildTick ??= _services.Framework.Every(TimeSpan.FromMilliseconds(100), MechHudRebuildTick);
+    }
+
+    private void MechHudRebuildTick()
+    {
+        if (Environment.TickCount64 < _mechHudRebuildAt) return;
+        _mechHudRebuildTick?.Dispose(); _mechHudRebuildTick = null;
+        if (MathF.Abs(_mechHudScale - _mechHudBuiltScale) < 0.001f) return;
+        _mechWindows.Remove(_mechHudWindow);
+        _mechHudWindow.Remove();
+        RegisterMechCalloutHud();   // same id → saved position restored
+    }
+
+    private HudElement BuildMechHudRoot(float sc)
     {
         var slots = new HudElement[MechHudSlots];
         for (int s = 0; s < MechHudSlots; s++)
         {
             int i = s;
-            var header = new TextElement(() => MechLineAt(i)?.Header ?? "",
-                Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted, Emphasis: true, Shadow: true, NoWrap: true);
+            // Bold via rich text: HudOverlay ignores Emphasis/Bold styling, and Emphasis would clobber the dynamic size.
+            var header = new TextElement(() => MechLineAt(i)?.Header is { } h ? "<b>" + h + "</b>" : "",
+                Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted, Shadow: true, NoWrap: true, FontSize: MechHudHeaderFont)
+                { DynamicFontSize = () => MechFont(MechHudHeaderFont) };
             var row = new RowElement(new HudElement[]
             {
-                new CellElement(new SwatchElement(() => MechRowColor(i), 10f), Width: 14f),
+                new CellElement(new SwatchElement(() => MechRowColor(i), MechHudSwatch * sc), Width: MechHudSwatchCell * sc),
                 new CellElement(new TextElement(() => MechLineAt(i)?.Row?.Label ?? "",
-                    Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, NoWrap: true), Width: MechHudLabelW),
+                    Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, NoWrap: true, FontSize: MechHudFont)
+                    { DynamicFontSize = () => MechFont(MechHudFont) }, Width: MechHudLabelW * sc),
                 // Fixed 4f spacer + the 6f row gap on each side = a 16f break (at a bare 6f gap neighbouring columns
                 // read as one run of text in game). Same break again between the timer and the names.
-                new SpacerElement(4f),
+                new SpacerElement(MechHudBreak * sc),
                 // Timer sits between label and names (names last) so a long name list can never run over it.
                 new CellElement(new TextElement(() => MechTimer(i),
-                    Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, NoWrap: true), Width: 48f),
-                new SpacerElement(4f),
+                    Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, NoWrap: true, FontSize: MechHudFont)
+                    { DynamicFontSize = () => MechFont(MechHudFont) }, Width: MechHudTimerW * sc),
+                new SpacerElement(MechHudBreak * sc),
                 // Names LAST, filling the rest of the row, as ONE wrapping Text (NoWrap off → HorizontalWrapMode.Wrap,
                 // and the Cell's VLG force-expands it to the cell width, so a long list wraps onto extra lines inside
                 // the cell instead of spilling). Two sibling Texts in a Row would both be squeezed proportionally by
                 // the HLG (the local name would wrap too), so the local-name accent+bold is inline rich text instead.
                 new CellElement(new TextElement(() => MechNames(i),
-                    Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true), Weight: 1f),
-            }, Gap: 6f);
+                    Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, FontSize: MechHudFont)
+                    { DynamicFontSize = () => MechFont(MechHudFont) }, Weight: 1f),
+            }, Gap: MechHudGap * sc);
 
             slots[s] = new ConditionalElement(() => MechLineAt(i) != null,
                 new ConditionalElement(() => MechLineAt(i)?.Header != null, header, Else: row));
         }
-        return new ColumnElement(slots, Gap: 3f) { Padding = (int)MechHudPad };   // Passive root has 0 padding
+        return new ColumnElement(slots, Gap: 3f * sc) { Padding = (int)MechHudPad };   // Passive root has 0 padding
     }
 
     private ColorRgba MechRowColor(int i)

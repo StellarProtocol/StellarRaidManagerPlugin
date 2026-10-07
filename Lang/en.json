@@ -99,6 +99,7 @@
   "rm.mech.list.order.arrival": "Arrival order",
   "rm.mech.list.order.table": "Table order",
   "rm.mech.list.order.urgent": "Most urgent first",
+  "rm.mech.list.textSize": "Text size",
   "rm.mech.list.title": "Callout List",
   "rm.mech.map.enable": "Show minimap",
   "rm.mech.map.floor": "Floor damage (raid)",

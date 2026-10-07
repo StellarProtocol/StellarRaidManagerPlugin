@@ -56,6 +56,7 @@ public sealed partial class Plugin
             OnClose: () => _mechWindow.SetVisible(false)));
         _mechWindows.Add(_mechWindow);
 
+        _mechHudScale = Math.Clamp(_cfg.Get<float>("mech_textscale", 1f), 0.75f, 2f);   // callout list "Text size"
         RegisterMechCalloutHud();   // Plugin.MechanicCalloutsHud.cs
         InitMechanicMinimap();      // Plugin.MechanicMinimap.cs (own toggles + HUD window)
         InitMechanicAlerts();       // Plugin.MechanicAlerts.cs (on-me banner + chime)
@@ -67,6 +68,7 @@ public sealed partial class Plugin
     private void DisposeMechanicCallouts()
     {
         DisposeMechanicAlerts();
+        _mechHudRebuildTick?.Dispose(); _mechHudRebuildTick = null;
         _mechTracker?.Dispose();
         DisposeMechanicMinimap();
         foreach (var w in _mechWindows) w.Remove();
@@ -122,7 +124,9 @@ public sealed partial class Plugin
                             _cfg.Save();
                         },
                         Width: 220f),
-                }, Gap: 6f)))),
+                }, Gap: 6f),
+                MechSliderRow("rm.mech.list.textSize", () => _mechHudScale, SetMechHudScale, 0.75f, 2f,
+                    () => $"{_mechHudScale:0.00}x")))),
         new SeparatorElement(),
 
         // ── Minimap ──

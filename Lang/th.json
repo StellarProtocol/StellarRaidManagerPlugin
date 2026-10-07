@@ -99,6 +99,7 @@
   "rm.mech.list.order.arrival": "ตามลำดับที่เกิดขึ้น",
   "rm.mech.list.order.table": "ตามลำดับตาราง",
   "rm.mech.list.order.urgent": "ด่วนที่สุดก่อน",
+  "rm.mech.list.textSize": "ขนาดตัวอักษร",
   "rm.mech.list.title": "รายการแจ้งเตือน",
   "rm.mech.map.enable": "แสดงมินิแมป",
   "rm.mech.map.floor": "พื้นที่เสียหาย (เรด)",

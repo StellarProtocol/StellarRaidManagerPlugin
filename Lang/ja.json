@@ -99,6 +99,7 @@
   "rm.mech.list.order.arrival": "到着順",
   "rm.mech.list.order.table": "ギミック表の順",
   "rm.mech.list.order.urgent": "緊急度の高い順",
+  "rm.mech.list.textSize": "文字サイズ",
   "rm.mech.list.title": "通知リスト",
   "rm.mech.map.enable": "ミニマップを表示",
   "rm.mech.map.floor": "床の損傷（レイド）",
