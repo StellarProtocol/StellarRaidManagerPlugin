@@ -4,51 +4,41 @@ using UnityEngine;
 
 namespace Stellar.RaidManager;
 
-// ── Raid: pinball ball (10330051) — one 6 s "Ball" row per ball, timed from the CAST, not entity first-seen ───────
-// In-game (Experiment c1313c9): the ball entity exists long before the mechanic (idle / pooled, ~91 s lag), so a
-// first-seen start had always expired → the row sat at 0.0 s. Start source, per ball:
-//   • "cast"   — the Pinball Cast buff 829314's server create time, while a cast is active or recent (≤ 15 s). Each NEW
-//                829314 instance re-arms every ball. The server create is converted ONCE per cast into a local tick
-//                (StartTick must stay stable: the occurrence dedupe keys on it, a jittering value re-fires alerts).
-//   • "moving" — otherwise, the moment the ball starts moving (XZ delta > 0.5 m between scans after ≥ 1.5 s still).
-// The row (and the ball's orange dot colour) exists only while the 6 s countdown runs — it hides the moment it expires,
-// even mid-cast (user: no rows sitting at 0.0 s); a new 829314 instance re-arms.
-// Idle balls before a cast get NO row and NO dot (pooled balls park at arbitrary spots — a dot there is misleading).
+// ── Raid: pinball "Ball" (dummy 10330051) — one 6 s row per ball, timed from the ball's SPAWN ────────────────────────
+// Ported from Experiment c2fa028. Why the Ball never showed: 10330051 is NOT spawned by the 829314 "Pinball Cast".
+//   • DummyTable 10330051 = "因果折跃" (Causal Jump field marker), WalkSpeed 0; BuffTable 829314 = "交互后倒计时"
+//     (countdown after interaction, on a scene object) — a different mechanic.
+//   • Raid log: the ball dummy appears ~5-10 s before each Causal Jump Ricochet 829316 and ~30-50 s before the next
+//     829314. Arming balls only while 829314 was recent never coincided with a ball, and the "moving" fallback never
+//     fires for a 0-speed dummy → no row, no orange dot, ever.
+// Upstream (resonance-logs-cn addPinballRows) times the ball from entity first-seen + 6 s — its spawn. Same here:
+//   • the spawn tick is taken ONCE per uuid (re-entering the AOI is not a new spawn); a ball already present on the
+//     scene's first raid scan is NOT a spawn (start unknown → no row until it moves);
+//   • "moving" — a ball that starts moving after ≥ 1.5 s still (XZ delta > 0.5 m) re-arms from that moment;
+//   • the row (and the ball's orange dot) exists only while its 6 s run — it hides at expiry (no 0.0 s rows).
 internal sealed partial class MechanicCalloutTracker
 {
-    private const long  BallDurMs = 6000, CastRecentMs = 15000, BallStillMs = 1500;
+    private const long  BallDurMs = 6000, BallStillMs = 1500;
     private const float BallMoveM = 0.5f;
 
-    private long _pinCastCreate;                 // server ms of the latest 829314 instance seen (0 = none this scene)
-    private long _pinCastStartTick;              // that create as a local TickCount64 (computed once per instance)
+    private readonly Dictionary<long, long> _ballSpawn = new();     // uuid → spawn tick (0 = present at scene entry)
     private readonly Dictionary<long, (Vector3 Pos, long MovedTick, long MoveStart)> _ballMotion = new();
     private readonly HashSet<long> _ballArmed = new();
+    private bool _ballSceneSeeded;
 
     private void RaidPinballBallRows()
     {
         long now = Environment.TickCount64;
-        long serverNow = ServerNowMs();
-        foreach (var b in _buffs)
-        {
-            if (b.BaseId != PinballCastBuff) continue;
-            if (b.Create > _pinCastCreate && serverNow > 0)
-            {
-                _pinCastCreate = b.Create;
-                _pinCastStartTick = now - Math.Max(0, serverNow + ClockBiasMs - b.Create);
-            }
-        }
-        bool castRecent = _pinCastStartTick > 0 && now - _pinCastStartTick <= CastRecentMs;
+        bool entry = !_ballSceneSeeded;                  // first raid scan of the scene: present balls aren't spawns
+        _ballSceneSeeded = true;
 
         _ballArmed.Clear();
         foreach (var e in _ents.Values)
         {
             if (e.MonsterId != PinballBallId) continue;
-            long moveStart = BallMoveStart(e, now);
-            long start;
-            if (castRecent) start = _pinCastStartTick;                  // "cast"
-            else if (moveStart > 0) start = moveStart;                   // "moving"
-            else continue;                                       // idle ball, no cast: no row, no dot
-            if (now - start >= BallDurMs) continue;                  // expired: hide at once (no 0.0 s row)
+            if (!_ballSpawn.TryGetValue(e.Uuid, out long spawn)) _ballSpawn[e.Uuid] = spawn = entry ? 0 : now;
+            long start = Math.Max(spawn, BallMoveStart(e, now));
+            if (start <= 0 || now - start >= BallDurMs) continue;   // unknown start / expired: hide (no 0.0 s row)
             _ballArmed.Add(e.Uuid);
             Upsert($"raid:pinball:ball:{e.Uuid}", "Pinball", "Ball", 5, 100, 0, BallDurMs, start);
         }
@@ -79,7 +69,6 @@ internal sealed partial class MechanicCalloutTracker
 
     private void ResetPinballBalls()
     {
-        _pinCastCreate = 0; _pinCastStartTick = 0;
-        _ballMotion.Clear(); _ballArmed.Clear();
+        _ballSpawn.Clear(); _ballMotion.Clear(); _ballArmed.Clear(); _ballSceneSeeded = false;
     }
 }

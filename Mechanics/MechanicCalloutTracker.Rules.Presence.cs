@@ -15,7 +15,7 @@ internal sealed partial class MechanicCalloutTracker
         if (AnyMonster(2106)) Upsert("giant:portal:correct", "Portal", "Correct Portal", 6, 100, 0, 0);
     }
 
-    // (Raid pinball ball rows: Rules.Pinball.cs — timed from the cast, not first-seen.)
+    // (Raid pinball ball rows: Rules.Pinball.cs — timed from the ball dummy's spawn, once per uuid.)
 
     // ── Tina: pizza waves (activePizzaDummies) ───────────────────────────────────────────────────────────────
     // Danger dummies spawn in batches of 8 within ms of each other; only the NEWEST batch (first-seen within 1 s of
