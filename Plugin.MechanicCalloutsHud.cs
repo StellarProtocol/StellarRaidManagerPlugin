@@ -46,7 +46,7 @@ public sealed partial class Plugin
 
     private float MechHudH(float s) => 2 * MechHudPad + (MechHudSlots * MechHudStride + MechHudWrapReserve) * s;
     private float MechHudMinWidth(float s) => 2 * MechHudPad + (MechHudMinW - 2 * MechHudPad) * s;
-    private int   MechFont(int basePx) => Math.Max(1, (int)MathF.Round(basePx * _mechHudScale));
+    private int   MechFont(int basePx) => Math.Max(8, (int)MathF.Round(basePx * _mechHudScale));
 
     private void RegisterMechCalloutHud()
     {
@@ -128,7 +128,8 @@ public sealed partial class Plugin
             var row = new RowElement(new HudElement[]
             {
                 new CellElement(new SwatchElement(() => MechRowColor(i), MechHudSwatch * sc), Width: MechHudSwatchCell * sc),
-                new CellElement(new TextElement(() => MechLineAt(i)?.Row?.Label ?? "",
+                // Label shortened with "…" to its column (HudOverlay text doesn't clip — Plugin.MechanicCalloutsHud.Wrap.cs).
+                new CellElement(new TextElement(() => MechLabel(i),
                     Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, NoWrap: true, FontSize: MechHudFont)
                     { DynamicFontSize = () => MechFont(MechHudFont) }, Width: MechHudLabelW * sc),
                 // Fixed 4f spacer + the 6f row gap on each side = a 16f break (at a bare 6f gap neighbouring columns
@@ -139,10 +140,9 @@ public sealed partial class Plugin
                     Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, NoWrap: true, FontSize: MechHudFont)
                     { DynamicFontSize = () => MechFont(MechHudFont) }, Width: MechHudTimerW * sc),
                 new SpacerElement(MechHudBreak * sc),
-                // Names LAST, filling the rest of the row, as ONE wrapping Text (NoWrap off → HorizontalWrapMode.Wrap,
-                // and the Cell's VLG force-expands it to the cell width, so a long list wraps onto extra lines inside
-                // the cell instead of spilling). Two sibling Texts in a Row would both be squeezed proportionally by
-                // the HLG (the local name would wrap too), so the local-name accent+bold is inline rich text instead.
+                // Names LAST, filling the rest of the row. HudOverlay text never wraps by itself, so MechNames breaks
+                // the list between names (",\n") against the cell's estimated width (Plugin.MechanicCalloutsHud.Wrap.cs);
+                // the local name stays inline rich text (accent + bold) — two sibling Texts would both be squeezed.
                 new CellElement(new TextElement(() => MechNames(i),
                     Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, FontSize: MechHudFont)
                     { DynamicFontSize = () => MechFont(MechHudFont) }, Weight: 1f),
@@ -166,19 +166,21 @@ public sealed partial class Plugin
     private readonly string?[] _mechNameLocal = new string?[MechHudSlots], _mechNameOthers = new string?[MechHudSlots],
                                _mechNameText = new string?[MechHudSlots];
     private readonly ColorRgba[] _mechNameAccent = new ColorRgba[MechHudSlots];   // theme switch → re-colour
+    private readonly float[] _mechNameWidth = new float[MechHudSlots], _mechNamePx = new float[MechHudSlots];   // re-wrap on resize / Text size
 
     private string MechNames(int i)
     {
         var row = MechLineAt(i)?.Row;
         if (row == null) return "";
         var c = _services.Theme.Colors.HudAccent;
+        float width = MathF.Round(MechNamesWidth()), px = MechFont(MechHudFont);
         if (_mechNameText[i] != null && _mechNameLocal[i] == row.LocalName && _mechNameOthers[i] == row.OtherNames
-            && _mechNameAccent[i] == c) return _mechNameText[i]!;
+            && _mechNameAccent[i] == c && _mechNameWidth[i] == width && _mechNamePx[i] == px) return _mechNameText[i]!;
         string local = row.LocalName.Length > 0
             ? $"<b><color=#{(int)(c.R * 255f):X2}{(int)(c.G * 255f):X2}{(int)(c.B * 255f):X2}>{row.LocalName}</color></b>" : "";
-        string sep   = local.Length > 0 && row.OtherNames.Length > 0 ? ", " : "";
         _mechNameLocal[i] = row.LocalName; _mechNameOthers[i] = row.OtherNames; _mechNameAccent[i] = c;
-        return _mechNameText[i] = local + sep + row.OtherNames;
+        _mechNameWidth[i] = width; _mechNamePx[i] = px;
+        return _mechNameText[i] = WrapNames(local, row.OtherNames, width, px);
     }
 
     // Countdown: hidden when the row has no duration (upstream hideTimer / durationMs ≤ 0).
