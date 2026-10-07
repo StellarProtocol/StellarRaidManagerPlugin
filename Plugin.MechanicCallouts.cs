@@ -161,6 +161,8 @@ public sealed partial class Plugin
                 SetMechBool("mech_map_enabled", v);
             }),
             new ConditionalElement(() => _mechMapEnabled, MechIndent(
+                MechSliderRow("rm.mech.map.size", () => _mechMapScale, SetMechMapScale, MechMapScaleMin, MechMapScaleMax,
+                    () => $"{_mechMapScale:0.0}x"),   // Plugin.MechanicMinimap.cs
                 MechToggleRow("rm.mech.map.markers", () => _mechMapMarkers, v =>
                 {
                     _mechMapMarkers = v;

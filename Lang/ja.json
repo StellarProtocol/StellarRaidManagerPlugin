@@ -105,6 +105,7 @@
   "rm.mech.map.floor": "床の損傷（レイド）",
   "rm.mech.map.hideNormal": "ギミック対象外の味方を隠す",
   "rm.mech.map.markers": "パーティーマーカー",
+  "rm.mech.map.size": "ミニマップサイズ",
   "rm.mech.map.title": "ミニマップ",
   "rm.mech.n.alreadyMatched": "同色済み",
   "rm.mech.n.ball": "弾",

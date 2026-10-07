@@ -105,6 +105,7 @@
   "rm.mech.map.floor": "พื้นที่เสียหาย (เรด)",
   "rm.mech.map.hideNormal": "ซ่อนเพื่อนร่วมทีมที่ไม่โดนกลไก",
   "rm.mech.map.markers": "มาร์กปาร์ตี้",
+  "rm.mech.map.size": "ขนาดมินิแมป",
   "rm.mech.map.title": "มินิแมป",
   "rm.mech.n.alreadyMatched": "ตรงกันแล้ว",
   "rm.mech.n.ball": "ลูกบอล",

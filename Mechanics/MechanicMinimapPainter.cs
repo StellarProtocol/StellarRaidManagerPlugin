@@ -20,14 +20,26 @@ internal sealed class MechanicMinimapPainter : IDisposable
     private static readonly ColorRgba BossC    = Rgba(239, 68, 68, 1f);     // #ef4444
     private static readonly ColorRgba White    = Rgba(255, 255, 255, 1f);
     private const float DeadAlpha = 0.35f;
-    private const float LocalR = 4f, MateR = 4f, MonsterR = 10f, LocalRingW = 2f;
+    // Dot sizes, scaled with the canvas ("Minimap size"): the base values below are px at the 300-px base canvas.
+    private readonly float LocalR, MateR, MonsterR, LocalRingW;
 
     private readonly MinimapRaster _r;
+    private readonly float _k;            // canvas size / MinimapProjector.BasePx — every px size in here is × _k
     private string _baseKey = "";
     private MinimapProjector _p;
     private float _scale;
 
-    public MechanicMinimapPainter(int size) => _r = new MinimapRaster(size);
+    // "Minimap size" re-creates the painter at the new size (a fresh raster rendered 1:1 — never a stretched 300-px
+    // texture), so all drawn sizes — dot radii, ring/arrow, marker badges, line/stroke widths, hatching step, insets,
+    // bitmap-text scale — are base px × _k and the whole picture grows proportionally with the map.
+    public MechanicMinimapPainter(int size)
+    {
+        _r = new MinimapRaster(size);
+        _k = size / (float)MinimapProjector.BasePx;
+        LocalR = 4f * _k; MateR = 4f * _k; MonsterR = 10f * _k; LocalRingW = 2f * _k;
+    }
+
+    private float K(float basePx) => basePx * _k;
 
     public object? Texture => _r.Texture;
 
@@ -51,15 +63,15 @@ internal sealed class MechanicMinimapPainter : IDisposable
     {
         if (slot < 1 || slot > 6) return;
         var (px, py) = P(x, z);
-        float lo = 10f, hi = _r.Size - 10f;
+        float lo = K(10f), hi = _r.Size - K(10f);
         px = MathF.Min(hi, MathF.Max(lo, px)); py = MathF.Min(hi, MathF.Max(lo, py));
         var c = MarkerC[slot - 1];
-        const float R = 8f;
-        _r.FillCircle(px + 1.5f, py + 2f, R + 0.5f, Rgba(0, 0, 0, 1f), 0.45f);       // drop shadow
+        float R = K(8f);
+        _r.FillCircle(px + K(1.5f), py + K(2f), R + K(0.5f), Rgba(0, 0, 0, 1f), 0.45f);       // drop shadow
         _r.FillCircle(px, py, R, c, 1f);
-        _r.StrokeCircle(px, py, R, 1.5f, Rgba(15, 15, 20, 1f), 0.95f);
+        _r.StrokeCircle(px, py, R, K(1.5f), Rgba(15, 15, 20, 1f), 0.95f);
         float luma = 0.299f * c.R + 0.587f * c.G + 0.114f * c.B;
-        _r.Text(slot.ToString(), px, py + 0.5f, 2, luma > 0.55f ? Rgba(10, 10, 12, 1f) : White, outline: false);
+        _r.Text(slot.ToString(), px, py + K(0.5f), K(2f), luma > 0.55f ? Rgba(10, 10, 12, 1f) : White, outline: false);
     }
     public void Dispose() => _r.Dispose();
 
@@ -98,18 +110,18 @@ internal sealed class MechanicMinimapPainter : IDisposable
         _r.Clear();
         float s = _r.Size;
         _r.FillRect(0, 0, s, s, Bg, 0.68f);
-        _r.StrokeRect(1, 1, s - 1, s - 1, 2f, Border, 0.72f);
+        _r.StrokeRect(K(1f), K(1f), s - K(1f), s - K(1f), K(2f), Border, 0.72f);
         var (ox, oy) = L(0, 0);
         foreach (float half in v.Squares)
         {
             float h = half * _scale;
-            _r.StrokeRect(ox - h, oy - h, ox + h, oy + h, 1f, SquareC, 0.45f);
+            _r.StrokeRect(ox - h, oy - h, ox + h, oy + h, K(1f), SquareC, 0.45f);
         }
-        foreach (float r in v.Circles) _r.StrokeCircle(ox, oy, r * _scale, 1.5f, LayoutC, 0.85f);
+        foreach (float r in v.Circles) _r.StrokeCircle(ox, oy, r * _scale, K(1.5f), LayoutC, 0.85f);
         foreach (var l in v.Lines)
         {
             var (sx, sy) = L(l.X1, l.Z1); var (ex, ey) = L(l.X2, l.Z2);
-            _r.Line(sx, sy, ex, ey, 2f, LayoutC, 0.9f);
+            _r.Line(sx, sy, ex, ey, K(2f), LayoutC, 0.9f);
         }
     }
 
@@ -120,7 +132,7 @@ internal sealed class MechanicMinimapPainter : IDisposable
         {
             var (ox, oy) = L(0, 0);
             _r.FillAnnulus(ox, oy, reg.RInner * _scale, reg.ROuter * _scale, c, 0.18f);
-            _r.StrokeCircle(ox, oy, reg.ROuter * _scale, 1.5f, c, 0.9f);
+            _r.StrokeCircle(ox, oy, reg.ROuter * _scale, K(1.5f), c, 0.9f);
             return;
         }
         if (reg.Kind == MinimapRegionKind.Sector)  { DrawSector(reg, c);  return; }
@@ -130,12 +142,12 @@ internal sealed class MechanicMinimapPainter : IDisposable
         var (bx, by) = P(reg.X + reg.HalfX, reg.Z + reg.HalfZ);
         if (reg.Style != 0) { DrawFloorCell(reg.Style, ax, ay, bx, by); return; }
         _r.FillRect(ax, ay, bx, by, c, 0.22f);
-        _r.StrokeRect(MathF.Min(ax, bx), MathF.Min(ay, by), MathF.Max(ax, bx), MathF.Max(ay, by), 1.5f, c, 0.9f);
+        _r.StrokeRect(MathF.Min(ax, bx), MathF.Min(ay, by), MathF.Max(ax, bx), MathF.Max(ay, by), K(1.5f), c, 0.9f);
         if (!string.IsNullOrEmpty(reg.Label))
         {
             var (tx, ty) = P(reg.X, reg.Z);
             // Tile labels ("1F".."3F"): plain white, dark-outlined, larger than the marker badges' numbers.
-            _r.Text(reg.Label!, tx, ty, 4, White, outline: true);
+            _r.Text(reg.Label!, tx, ty, K(4f), White, outline: true);
         }
     }
 
@@ -162,7 +174,7 @@ internal sealed class MechanicMinimapPainter : IDisposable
         float dx = ax - x, dy = ay - y, len = MathF.Sqrt(dx * dx + dy * dy);
         if (len < 1e-4f) return;
         dx /= len; dy /= len;
-        float b = rr + LocalRingW + 3f, tip = b + 7f, hw = 4f;
+        float b = rr + LocalRingW + K(3f), tip = b + K(7f), hw = K(4f);
         _r.FillTriangle(x + dx * tip, y + dy * tip,
                         x + dx * b - dy * hw, y + dy * b + dx * hw,
                         x + dx * b + dy * hw, y + dy * b - dx * hw, c, 1f);
@@ -182,33 +194,36 @@ internal sealed class MechanicMinimapPainter : IDisposable
             var red = MechanicCalloutData.SlotColor(3);
             _r.FillRect(x0, y0, x1, y1, red, 0.35f);
             float h = y1 - y0;
-            for (float sx = x0 - h; sx < x1; sx += 9f)
+            float step = K(9f), i1 = K(1f);
+            for (float sx = x0 - h; sx < x1; sx += step)
             {
                 // stripe from (sx, y1) to (sx + h, y0), clipped to the cell by its x range
                 float ax0 = sx, ay0 = y1, ax1 = sx + h, ay1 = y0;
                 if (ax0 < x0) { ay0 -= x0 - ax0; ax0 = x0; }
                 if (ax1 > x1) { ay1 += ax1 - x1; ax1 = x1; }
-                if (ax1 > ax0) _r.Line(ax0, ay0, ax1, ay1, 2f, red, 0.75f);
+                if (ax1 > ax0) _r.Line(ax0, ay0, ax1, ay1, K(2f), red, 0.75f);
             }
-            _r.StrokeRect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, 2.5f, red, 1f);
+            _r.StrokeRect(x0 + i1, y0 + i1, x1 - i1, y1 - i1, K(2.5f), red, 1f);
             return;
         }
+        float lw = K(1.5f);
         if (style == 1)
         {
             _r.FillRect(x0, y0, x1, y1, CrackC, 0.28f);
             float w = x1 - x0, h = y1 - y0;
             // Three jagged crack strokes across the cell.
-            _r.Line(x0 + w * 0.10f, y0 + h * 0.20f, x0 + w * 0.45f, y0 + h * 0.55f, 1.5f, CrackC, 0.95f);
-            _r.Line(x0 + w * 0.45f, y0 + h * 0.55f, x0 + w * 0.35f, y0 + h * 0.90f, 1.5f, CrackC, 0.95f);
-            _r.Line(x0 + w * 0.45f, y0 + h * 0.55f, x0 + w * 0.85f, y0 + h * 0.35f, 1.5f, CrackC, 0.95f);
-            _r.Line(x0 + w * 0.85f, y0 + h * 0.35f, x0 + w * 0.95f, y0 + h * 0.75f, 1.5f, CrackC, 0.95f);
-            _r.StrokeRect(x0, y0, x1, y1, 1.5f, CrackC, 0.9f);
+            _r.Line(x0 + w * 0.10f, y0 + h * 0.20f, x0 + w * 0.45f, y0 + h * 0.55f, lw, CrackC, 0.95f);
+            _r.Line(x0 + w * 0.45f, y0 + h * 0.55f, x0 + w * 0.35f, y0 + h * 0.90f, lw, CrackC, 0.95f);
+            _r.Line(x0 + w * 0.45f, y0 + h * 0.55f, x0 + w * 0.85f, y0 + h * 0.35f, lw, CrackC, 0.95f);
+            _r.Line(x0 + w * 0.85f, y0 + h * 0.35f, x0 + w * 0.95f, y0 + h * 0.75f, lw, CrackC, 0.95f);
+            _r.StrokeRect(x0, y0, x1, y1, lw, CrackC, 0.9f);
             return;
         }
+        float i3 = K(3f);
         _r.FillRect(x0, y0, x1, y1, HoleC, 0.78f);
-        _r.Line(x0 + 3, y0 + 3, x1 - 3, y1 - 3, 2f, HoleEdge, 0.9f);
-        _r.Line(x1 - 3, y0 + 3, x0 + 3, y1 - 3, 2f, HoleEdge, 0.9f);
-        _r.StrokeRect(x0, y0, x1, y1, 1.5f, HoleEdge, 0.9f);
+        _r.Line(x0 + i3, y0 + i3, x1 - i3, y1 - i3, K(2f), HoleEdge, 0.9f);
+        _r.Line(x1 - i3, y0 + i3, x0 + i3, y1 - i3, K(2f), HoleEdge, 0.9f);
+        _r.StrokeRect(x0, y0, x1, y1, lw, HoleEdge, 0.9f);
     }
 
     // drawSectorRegion: centre + arc points every ≤ 8° (≥ 6 steps), point = (x + sin·r, z + cos·r); fill 0.24,
@@ -243,14 +258,14 @@ internal sealed class MechanicMinimapPainter : IDisposable
     {
         _r.FillPolygon(_poly, n, c, fillA);
         for (int i = 0, j = n - 1; i < n; j = i++)
-            _r.Line(_poly[2 * j], _poly[2 * j + 1], _poly[2 * i], _poly[2 * i + 1], 1.5f, c, strokeA);
+            _r.Line(_poly[2 * j], _poly[2 * j + 1], _poly[2 * i], _poly[2 * i + 1], K(1.5f), c, strokeA);
     }
 
-    // drawLineRegion: alpha 0.5, widthPx (default 2).
+    // drawLineRegion: alpha 0.5, widthPx (default 2) — px at the base canvas, scaled like everything else.
     private void DrawLineRegion(in MinimapRegion reg, ColorRgba c)
     {
         var (sx, sy) = P(reg.X, reg.Z); var (ex, ey) = P(reg.X2, reg.Z2);
-        _r.Line(sx, sy, ex, ey, reg.WidthPx > 0 ? reg.WidthPx : 2f, c, 0.5f);
+        _r.Line(sx, sy, ex, ey, K(reg.WidthPx > 0 ? reg.WidthPx : 2f), c, 0.5f);
     }
 
     // Team = circle (local white with a white ring, teammates sky-blue), mechanic colour overrides + halo;
@@ -266,12 +281,12 @@ internal sealed class MechanicMinimapPainter : IDisposable
         if (d.Kind == MinimapDotKind.Monster)
         {
             float r = MonsterR;
-            if (mech) _r.FillCircle(x, y, r + 3f, c, 0.3f);
+            if (mech) _r.FillCircle(x, y, r + K(3f), c, 0.3f);
             _r.FillTriangle(x, y - r, x + r * 0.866f, y + r * 0.5f, x - r * 0.866f, y + r * 0.5f, c, 1f);
             return;
         }
         float rr = d.Kind == MinimapDotKind.Local ? LocalR : MateR;
-        if (mech) _r.FillCircle(x, y, rr + 4f, c, 0.35f);
+        if (mech) _r.FillCircle(x, y, rr + K(4f), c, 0.35f);
         _r.FillCircle(x, y, rr, c, 1f);
         if (d.Kind == MinimapDotKind.Local)
         {
@@ -286,7 +301,8 @@ internal sealed class MechanicMinimapPainter : IDisposable
 // +X up, +Z left). Pixel y grows DOWN.
 internal readonly struct MinimapProjector
 {
-    public const float Pad = 10f;
+    public const float Pad = 10f;      // at the BASE canvas; scaled with the canvas so a resized map is the same picture
+    public const int BasePx = 300;     // base canvas size ("Minimap size" 1.0×)
     public readonly float Scale, Cx, Cy, Ox, Oz;
     public readonly int Rot, Size;
 
@@ -298,7 +314,8 @@ internal readonly struct MinimapProjector
         int rot = ((v.RotationQuarters % 4) + 4) % 4;
         bool quarter = rot % 2 == 1;
         float halfW = quarter ? v.HalfX : v.HalfZ, halfH = quarter ? v.HalfZ : v.HalfX;
-        float scale = MathF.Min((size - Pad * 2) / (halfW * 2), (size - Pad * 2) / (halfH * 2));
+        float pad = Pad * size / BasePx;
+        float scale = MathF.Min((size - pad * 2) / (halfW * 2), (size - pad * 2) / (halfH * 2));
         return new MinimapProjector(scale, size / 2f, size / 2f, rot, size, v.OriginX, v.OriginZ);
     }
 

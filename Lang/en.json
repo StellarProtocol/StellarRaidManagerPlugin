@@ -105,6 +105,7 @@
   "rm.mech.map.floor": "Floor damage (raid)",
   "rm.mech.map.hideNormal": "Hide teammates without a mechanic",
   "rm.mech.map.markers": "Party markers",
+  "rm.mech.map.size": "Minimap size",
   "rm.mech.map.title": "Minimap",
   "rm.mech.n.alreadyMatched": "Already matched",
   "rm.mech.n.ball": "Ball",

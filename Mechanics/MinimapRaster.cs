@@ -185,8 +185,9 @@ internal sealed class MinimapRaster : IDisposable
         }
     }
 
-    // ── Tiny 3×5 bitmap font: digits plus 'F' and '?' (region labels "1F".."3F", markers 1..6). Scaled; with
-    // `outline` a 1-px dark rim is drawn first so light text stays legible on any fill. ─────────────────────────
+    // ── Tiny 3×5 bitmap font: digits plus 'F' and '?' (region labels "1F".."3F", markers 1..6). Scaled (float, so
+    // the "Minimap size" factor carries through — glyph cells are AA rects, fractional is fine); with `outline` a dark
+    // rim (scale/4, ≥ 1 px — 1 px at the base label scale 4) is drawn first so light text stays legible on any fill. ─
     private static readonly string[] Glyphs =
     {
         "111101101101111", "010110010010111", "111001111100111", "111001111001111", "101101111001001",
@@ -197,14 +198,14 @@ internal sealed class MinimapRaster : IDisposable
     private static string? Glyph(char ch) =>
         ch >= '0' && ch <= '9' ? Glyphs[ch - '0'] : ch == 'F' || ch == 'f' ? GlyphF : ch == '?' ? GlyphQ : null;
 
-    public void Digits(string text, float cx, float cy, int scale, ColorRgba c) => Text(text, cx, cy, scale, c, outline: true);
+    public void Digits(string text, float cx, float cy, float scale, ColorRgba c) => Text(text, cx, cy, scale, c, outline: true);
 
-    public void Text(string text, float cx, float cy, int scale, ColorRgba c, bool outline)
+    public void Text(string text, float cx, float cy, float scale, ColorRgba c, bool outline)
     {
         int n = 0;
         foreach (char ch in text) if (Glyph(ch) != null) n++;
         if (n == 0) return;
-        float w = n * 4 * scale - scale, x0 = cx - w / 2f, y0 = cy - 2.5f * scale;
+        float w = n * 4 * scale - scale, x0 = cx - w / 2f, y0 = cy - 2.5f * scale, rim = MathF.Max(1f, scale / 4f);
         var dark = new ColorRgba(0f, 0f, 0f, 1f);
         for (int pass = outline ? 0 : 1; pass < 2; pass++)
         {
@@ -218,7 +219,7 @@ internal sealed class MinimapRaster : IDisposable
                     {
                         if (g[r * 3 + col] != '1') continue;
                         float gx = x0 + (k * 4 + col) * scale, gy = y0 + r * scale;
-                        if (pass == 0) FillRect(gx - 1, gy - 1, gx + scale + 1, gy + scale + 1, dark, 0.85f);
+                        if (pass == 0) FillRect(gx - rim, gy - rim, gx + scale + rim, gy + scale + rim, dark, 0.85f);
                         else           FillRect(gx, gy, gx + scale, gy + scale, c, 1f);
                     }
                 k++;

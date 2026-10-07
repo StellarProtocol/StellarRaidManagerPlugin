@@ -11,10 +11,24 @@ namespace Stellar.RaidManager;
 // upload is all a redraw needs). The paint happens lazily inside the texture getter, which the framework only polls
 // while the window is active, and only when the tracker's MapVersion moved (≈ 5 Hz in the raid) — idle otherwise.
 // Window style mirrors the callout HUD: HUD category, Borderless, EditModeDragOnly, Passive (pure info, no clicks).
-// No BringToFront (CLAUDE.md rule 5). Config keys: mech_map_enabled / _markers / _hidenormal / _floor.
+// No BringToFront (CLAUDE.md rule 5). Config keys: mech_map_enabled / _markers / _hidenormal / _floor / _scale.
+//
+// MINIMAP SIZE (slider 0.5–2.0×, step 0.1, config mech_map_scale, default 1.0×; port of Experiment dbcc76f): the
+// texture AND the on-screen size are round(300 × scale) px — still 1:1 texels, so a bigger map is re-RENDERED at the
+// new size (crisp), never a stretched 300-px texture. The painter scales every drawn px size with the canvas
+// (Mechanics/MechanicMinimapPainter.cs). The GameTextureElement size and the window rect are baked at registration, so
+// a change re-creates the painter (old Texture2D destroyed) and RE-REGISTERS the window under the same id (saved
+// position kept) once the slider has been still for 300 ms — like the callout list's Text size. A map whose toggle
+// is off stays removed.
 public sealed partial class Plugin
 {
-    private const int MechMapPx = 300;                     // texture AND on-screen size (1:1 texels → crisp)
+    private const int MechMapBasePx = 300;                 // canvas at 1.0× (MinimapProjector.BasePx)
+    private const float MechMapScaleMin = 0.5f, MechMapScaleMax = 2f;
+    private float _mechMapScale = 1f;                      // live "Minimap size"
+    private int   _mechMapBuiltPx = MechMapBasePx;         // px the current painter (and the window) were built at
+    private long  _mechMapRebuildAt;                       // debounce deadline for the re-create
+    private IDisposable? _mechMapRebuildTick;
+    private int MechMapPx => (int)MathF.Round(MechMapBasePx * _mechMapScale);   // texture AND on-screen size (1:1 → crisp)
     private IWindowControl?        _mechMapWindow;       // null while removed (map toggle off)
     private MechanicMinimapPainter _mechMapPainter = null!;
     private bool _mechMapEnabled;
@@ -29,9 +43,41 @@ public sealed partial class Plugin
         _mechMapMarkers = _cfg.Get<bool>("mech_map_markers", true);
         _mechMapHideNormal = _cfg.Get<bool>("mech_map_hidenormal", false);
         _mechMapFloor = _cfg.Get<bool>("mech_map_floor", true);
-        _mechMapPainter = new MechanicMinimapPainter(MechMapPx);
-        ApplyMechMapOptions();
+        _mechMapScale = Math.Clamp(_cfg.Get<float>("mech_map_scale", 1f), MechMapScaleMin, MechMapScaleMax);
+        CreateMechMapPainter();
         if (_mechMapEnabled) RegisterMechMapHud();   // off ⇒ never registered (not even in the layout editor)
+    }
+
+    // (Re)create the painter at the current "Minimap size" — disposing the old one destroys its Texture2D, so the
+    // caller removes a window still bound to it first.
+    private void CreateMechMapPainter()
+    {
+        _mechMapPainter?.Dispose();
+        _mechMapBuiltPx = MechMapPx;
+        _mechMapPainter = new MechanicMinimapPainter(_mechMapBuiltPx);
+        ApplyMechMapOptions();                  // carries the display options over + forces a repaint
+    }
+
+    private void SetMechMapScale(float v)
+    {
+        _mechMapScale = Math.Clamp(MathF.Round(v * 10f) / 10f, MechMapScaleMin, MechMapScaleMax);   // 0.1 steps
+        _cfg.Set<float>("mech_map_scale", _mechMapScale);
+        _cfg.Save();
+        _mechMapRebuildAt = Environment.TickCount64 + 300;
+        _mechMapRebuildTick ??= _services.Framework.Every(TimeSpan.FromMilliseconds(100), MechMapRebuildTick);
+    }
+
+    private void MechMapRebuildTick()
+    {
+        if (Environment.TickCount64 < _mechMapRebuildAt) return;
+        _mechMapRebuildTick?.Dispose(); _mechMapRebuildTick = null;
+        if (MechMapPx == _mechMapBuiltPx) return;
+        // Map toggled off inside the debounce ⇒ the window is already removed: only the painter is re-made; don't
+        // resurrect the window (it is registered at the new size when the toggle comes back on).
+        bool had = _mechMapWindow != null;
+        RemoveMechHud(ref _mechMapWindow);   // before the painter dispose: the window still shows the old texture
+        CreateMechMapPainter();
+        if (had) RegisterMechMapHud();       // same id → saved position restored
     }
 
     private void RegisterMechMapHud()
@@ -41,7 +87,7 @@ public sealed partial class Plugin
                 Id:          "raidmanager.mech.map",
                 Title:       _loc.T("rm.mech.hud.map"),
                 // Constant 1440p-calibrated rect, to the right of the callout list's default spot.
-                DefaultRect: new WindowRect(540f, 420f, MechMapPx + 16f, MechMapPx + 16f),
+                DefaultRect: new WindowRect(540f, 420f, _mechMapBuiltPx + 16f, _mechMapBuiltPx + 16f),
                 Category:    WindowCategory.HUD,
                 Style:       WindowPanelStyle.Borderless)
             {
@@ -52,7 +98,7 @@ public sealed partial class Plugin
             },
             Root: new ColumnElement(new HudElement[]
             {
-                new GameTextureElement(MechMapTexture, MechMapPx, MechMapPx) { Fill = true },
+                new GameTextureElement(MechMapTexture, _mechMapBuiltPx, _mechMapBuiltPx) { Fill = true },
             }) { Padding = 8 },
             OnClose: () => { }));
         _mechWindows.Add(_mechMapWindow);  // DisposeMechanicCallouts Remove()s each
@@ -72,6 +118,7 @@ public sealed partial class Plugin
     private void DisposeMechanicMinimap()
     {
         SetMechMapTick(false);
+        _mechMapRebuildTick?.Dispose(); _mechMapRebuildTick = null;
         _mechMapPainter?.Dispose();
     }
 
