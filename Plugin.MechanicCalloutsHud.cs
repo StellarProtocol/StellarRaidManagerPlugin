@@ -23,7 +23,8 @@ public sealed partial class Plugin
     // below the top-stacked rows (root VLG is UpperLeft, childForceExpandHeight off).
     private const float MechHudPad = 20f /* column only — Passive root has none */, MechHudStride = 21f, MechHudWrapReserve = 6 * 18f;
     private const float MechHudH = 2 * MechHudPad + MechHudSlots * MechHudStride + MechHudWrapReserve;   // = 484
-    private const float MechHudMinW = 480f, MechHudMaxW = 1200f;
+    private const float MechHudLabelW = 300f;   // mechanic-name column (was 230; long th/fil names)
+    private const float MechHudMinW = 550f, MechHudMaxW = 1200f;   // +70 with the label column: timer + names keep their width
 
     private void RegisterMechCalloutHud()
     {
@@ -81,7 +82,7 @@ public sealed partial class Plugin
             {
                 new CellElement(new SwatchElement(() => MechRowColor(i), 10f), Width: 14f),
                 new CellElement(new TextElement(() => MechLineAt(i)?.Row?.Label ?? "",
-                    Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, NoWrap: true), Width: 230f),
+                    Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, NoWrap: true), Width: MechHudLabelW),
                 // Fixed 4f spacer + the 6f row gap on each side = a 16f break (at a bare 6f gap neighbouring columns
                 // read as one run of text in game). Same break again between the timer and the names.
                 new SpacerElement(4f),
