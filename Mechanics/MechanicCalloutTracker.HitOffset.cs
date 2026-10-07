@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Stellar.Abstractions.Services;
-using static Stellar.RaidManager.MechanicCalloutData;
 
 namespace Stellar.RaidManager;
 
@@ -15,49 +13,36 @@ namespace Stellar.RaidManager;
 //     while siblings in the same row group run to expiry (Mirage Decay 829307 → ~0 ms), so offsets are keyed per
 //     mechanic, not per group:
 //       key = "b<baseId>" for buff rows (row key starts with the buff id), "g_<group slug>" for rule rows.
-//     Shown countdown = remain − offset (≥ 0); offset = the user's manual value if set (0 = no offset), else the
-//     built-in default. The row still lives as long as the buff.
-//     Defaults: 2.0 s for Share 829304 / Spread 829308 / Mirage Share 829305 / Mirage Spread 829309; 0 elsewhere
-//     (Decay 829306 / Mirage Decay 829307 run to expiry in the logs).
-//   ⚠ NO auto-learning (user decision): learned medians silently moved the countdown. The user tunes offsets by eye
-//     in the Hit Offsets window; good values get baked into DefaultHit.
-// Config (RaidManager "settings" section): mechhit_<key> manual seconds (e.g. mechhit_b829304,
-// mechhit_g_charge_clone); missing/negative = default.
+//     Shown countdown = remain − offset (≥ 0); the row still lives as long as the buff, and shows "NOW" while the
+//     offset window runs (McRow.IsHitNow). In RaidManager the offsets are HARDCODED (HitOffsets below) — no user
+//     adjustment, no config; tuning happens in the Experiment plugin's Hit Offsets window.
 internal sealed partial class MechanicCalloutTracker
 {
-    public IConfigSection? Cfg { get; set; }
-
-    private static readonly Dictionary<string, float> DefaultHit = new()
+    // ⭐ THE hit-offset table (seconds before debuff expiry that the mechanic actually lands). Values are tuned in the
+    // StellarExperimentPlugin (Hit Offsets window, by eye in real raids) and COPIED here — change them there first.
+    // Keys: "b<buff base id>" for buff rows, "g_<group slug>" (GroupHitKey) for rule rows. Missing key = 0 (no offset).
+    private static readonly Dictionary<string, float> HitOffsets = new()
     {
-        ["b829304"] = 2f, ["b829308"] = 2f, ["b829305"] = 2f, ["b829309"] = 2f,
+        ["b829304"] = 2f,   // Share
+        ["b829308"] = 2f,   // Spread
+        ["b829305"] = 2f,   // Mirage Share
+        ["b829309"] = 2f,   // Mirage Spread
+        // Decay 829306 / Mirage Decay 829307 run to expiry in the logs → 0.
     };
 
-    private readonly Dictionary<string, float> _hitManual = new();
-    // Mechanics seen live with / without a countdown (Hit Offsets window hides never-timed ones — offset meaningless).
-    private readonly HashSet<string> _hitSeenTimed = new(), _hitSeenUntimed = new();
-    // Rule groups that never show a countdown (untimed rows by construction).
-    private static readonly HashSet<string> UntimedRuleGroups = new()
-    {
-        "Electromagnetic Ring Sequence", "Portal", "Pizza Danger Zone", "Ice/Sea Wave Safe Zone",
-    };
-
-    // False when the mechanic is known never to show a countdown: an untimed rule group, or only ever seen untimed.
-    public bool HitMechanicTimed(string key, string group) =>
-        !(key.StartsWith("g_", StringComparison.Ordinal) && UntimedRuleGroups.Contains(group))
-        && !(_hitSeenUntimed.Contains(key) && !_hitSeenTimed.Contains(key));
     private readonly List<long> _biasSamples = new();
     public long ClockBiasMs { get; private set; }
 
-    public static string HitSlug(string s)
+    private static string HitSlug(string s)
     {
         var sb = new StringBuilder();
         foreach (char ch in s.ToLowerInvariant()) sb.Append(char.IsLetterOrDigit(ch) ? ch : '_');
         return sb.ToString();
     }
 
-    public static string GroupHitKey(string group) => "g_" + HitSlug(group);
+    private static string GroupHitKey(string group) => "g_" + HitSlug(group);
 
-    // Mechanic key of a live row: buff rows → b<baseId>; rule rows → g_<group>.
+    // Mechanic key of a live row: buff rows → b<baseId>; rule rows → g_<group> (English group, language-independent).
     private static string MechKey(McRow r)
     {
         int n = 0;
@@ -65,41 +50,7 @@ internal sealed partial class MechanicCalloutTracker
         return n > 0 ? "b" + r.Key.Substring(0, n) : GroupHitKey(r.Group);
     }
 
-    public static float DefaultHitOffset(string key) => DefaultHit.TryGetValue(key, out float d) ? d : 0f;
-
-    // The offset in effect: the manual value when set (0 = no offset), else the built-in default.
-    public float HitOffset(string key)
-    {
-        if (_hitManual.TryGetValue(key, out float v)) return v;
-        v = Cfg?.Get<float>("mechhit_" + key, -1f) ?? -1f;
-        return _hitManual[key] = v < 0f ? DefaultHitOffset(key) : v;
-    }
-
-    public bool HitOffsetIsDefault(string key) => (Cfg?.Get<float>("mechhit_" + key, -1f) ?? -1f) < 0f;
-
-    public void SetManualHitOffset(string key, float sec)
-    {
-        _hitManual[key] = sec;
-        if (Cfg == null) return;
-        Cfg.Set<float>("mechhit_" + key, sec);
-        Cfg.Save();
-    }
-
-    // Back to the built-in default: −1 = "not set" (the config API has no key removal).
-    public void ResetHitOffset(string key)
-    {
-        _hitManual.Remove(key);
-        if (Cfg == null) return;
-        Cfg.Set<float>("mechhit_" + key, -1f);
-        Cfg.Save();
-    }
-
-    private float RowHitOffset(McRow r)
-    {
-        string key = MechKey(r);
-        _hitSeenTimed.Add(key);
-        return HitOffset(key);
-    }
+    private static float RowHitOffset(McRow r) => HitOffsets.TryGetValue(MechKey(r), out float s) ? s : 0f;
 
     // First sight of a buff row: (create − serverNow) if it was created within ~1 s → bias sample.
     private void SampleClockBias(long createMs)

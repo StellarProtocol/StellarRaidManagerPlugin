@@ -10,12 +10,6 @@ internal static partial class McText
 {
     private static readonly Dictionary<string, string> Names = new(StringComparer.Ordinal)
     {
-        ["Cursed Radiant Tomb"] = "rm.mech.n.sceneTomb",
-        ["Sea-Ringed Reef"] = "rm.mech.n.sceneReef",
-        ["Forgotten Dreamwild (raid)"] = "rm.mech.n.sceneRaid",
-        ["Towering Ruin"] = "rm.mech.n.sceneRuin",
-        ["Tina's Mindrealm"] = "rm.mech.n.sceneTina",
-        ["Wasteland Court"] = "rm.mech.n.sceneWasteland",
         ["Phase"] = "rm.mech.n.phase",
         ["Edge-Mid Explosion"] = "rm.mech.n.edgeMid",
         ["Corner Explosion"] = "rm.mech.n.corner",

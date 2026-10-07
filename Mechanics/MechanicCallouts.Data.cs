@@ -202,7 +202,7 @@ internal static class MechanicCalloutData
             new[] { 829104, 829105, 829106, 829115, 829116, 829214, 829215, 829217, 829226, 829227, 829228, 829245, 829304,
                     829305, 829306, 829307, 829308, 829309, 829314, 829316, 829318, 829323, 829324, 829326, 829327, 829328,
                     829329, 829330, 829331, 829332, 829372, 829373, 829374,
-                    // boss "release" buffs = Share / Decay / Spread hit moment (no rows; Release.cs learns offsets)
+                    // boss "release" buffs = Share / Decay / Spread hit moment (no rows; Release.cs shows "NOW")
                     829310, 829311, 829312,
                     // NOT yet used (raid logs, data note only): 829238 death teleport to a living teammate (player) ·
                     //   829320 时停 time stop (player) · 829321 渐隐 fade · 829325 连结试炼 Linked Trial (player) ·

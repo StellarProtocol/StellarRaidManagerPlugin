@@ -13,12 +13,12 @@ namespace Stellar.RaidManager;
 //   • the callout LIST  `● <mechanic>  <countdown>  <you>, <others>`        — Plugin.MechanicCalloutsHud.cs
 //   • the MINIMAP (arena, regions, team/boss dots, party markers)           — Plugin.MechanicMinimap.cs
 //   • the ON-ME banner ("<mechanic> — YOU", Phase Mapping MOVE OFF) + chime — Plugin.MechanicAlerts*.cs
-// plus the Hit Offsets window (per-mechanic countdown-to-the-hit tuning) — Plugin.MechanicHitOffsets.cs.
+// Countdowns end at the HIT via a hardcoded per-mechanic offset table (Mechanics/MechanicCalloutTracker.HitOffset.cs;
+// tuned in the Experiment plugin, no user adjustment here).
 //
 // The sub-menu is opened from a button in the Raid Manager settings window (Plugin.Settings.cs); it has no launcher
-// tile and no hotkeys. Config lives in the plugin's "settings" section, keys prefixed `mech_` (hit offsets:
-// `mechhit_<key>`, Mechanics/MechanicCalloutTracker.HitOffset.cs). Every label goes through _loc.T("rm.mech.*")
-// (Rule 10); mechanic/scene names through McText (rm.mech.n.*).
+// tile and no hotkeys. Config lives in the plugin's "settings" section, keys prefixed `mech_`. Every label goes
+// through _loc.T("rm.mech.*") (Rule 10); mechanic/arena names through McText (rm.mech.n.*).
 public sealed partial class Plugin
 {
     private IWindowControl         _mechWindow = null!;
@@ -36,7 +36,7 @@ public sealed partial class Plugin
         McText.Loc = _loc;
         _mechEnabled  = _cfg.Get<bool>("mech_enabled", false);
 
-        _mechTracker = new MechanicCalloutTracker(_services) { Cfg = _cfg };
+        _mechTracker = new MechanicCalloutTracker(_services);
         _mechWindow = _services.Windows.Register(new WindowRegistration(
             Spec: new WindowSpec(
                 Id: "raidmanager.mech.settings",
@@ -54,7 +54,6 @@ public sealed partial class Plugin
 
         RegisterMechCalloutHud();   // Plugin.MechanicCalloutsHud.cs
         InitMechanicMinimap();      // Plugin.MechanicMinimap.cs (own toggles + HUD window)
-        InitMechanicHitOffsets();   // Plugin.MechanicHitOffsets.cs
         InitMechanicAlerts();       // Plugin.MechanicAlerts.cs (on-me banner + chime)
 
         // Persisted-on ⇒ start the poll now (it self-gates to in-world + supported scene each tick).
@@ -120,10 +119,6 @@ public sealed partial class Plugin
             ApplyMechMapOptions();
             SetMechBool("mech_map_floor", v);
         }),
-        new RowElement(new HudElement[]
-        {
-            new ButtonElement(() => _loc.T("rm.mech.hit.open"), OnClick: () => _mechHitWindow.SetVisible(true)),
-        }, Gap: 8f),
         new TextElement(() => _loc.T("rm.mech.help"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
         new SeparatorElement(),
         BuildMechAlertSection(),    // Plugin.MechanicAlerts.cs — "Mechanic Alerts" in this same menu

@@ -130,7 +130,6 @@ internal sealed partial class MechanicCalloutTracker
                 else { row.SnapTick = Environment.TickCount64; row.SnapRemain = ComputeSnapRemain(a.DurMs, a.CreateMs); }
             }
             row.OffsetSec = row.HasTimer ? RowHitOffset(row) : 0f;   // per-mechanic; shown countdown = remain − offset
-            if (!row.HasTimer) _hitSeenUntimed.Add(MechKey(row));
             FinishTargets(row, a, localUuid);
         }
     }
