@@ -75,7 +75,7 @@ internal sealed partial class MechanicCalloutTracker
         // every region here even with grid buffs active (first in-game report: dots shown, tiles never).
         if (!(_raidArena == RaidArena.Kind.Ring && _arenaConfident))
         {
-            AddFloorRegions();                                          // floor damage UNDER the mechanic cells
+            AddFloorRegions();                                          // floor damage UNDER the mechanic cells (local floor only)
             var seen = new HashSet<int>();                              // dedupeRegions: one danger rect per cell
             // Edge-Mid / Corner Explosion (829214/829215) = DANGER floor tiles (user correction): the SAME red no-go
             // Style 3 as Phase Mapping, NOT a plain colour-slot cell. The old Cell(id,colour) drew Style-0 fills

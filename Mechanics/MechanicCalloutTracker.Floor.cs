@@ -33,6 +33,9 @@ internal sealed partial class MechanicCalloutTracker
         public bool HadTile, DummyDestroyed, DummyCracked;
         public bool Pending; public int PendingPass;
         public FloorState State = FloorState.Unknown;
+        // World Y of the cell's floor (tile, else the dummy that marked it) — NaN until seen. Draw gate: the remembered
+        // damage is only drawn while the local player is on THIS floor (AddFloorRegions).
+        public float Y = float.NaN;
     }
 
     private static readonly HashSet<int> FloorTileIds = new() { 3531, 3532 };
@@ -47,6 +50,7 @@ internal sealed partial class MechanicCalloutTracker
     private readonly HashSet<long> _floorDummySeen = new();                 // dummy uuids whose spawn was handled
     private readonly HashSet<long> _floorSeenThisPass = new();
     private int _floorPasses;
+    private float _floorGridY = float.NaN;                                 // last seen floor-tile Y (cells without their own)
 
     private bool FloorTracking(SceneDef def) =>
         def.Kind == SceneKind.Raid && MapEnabled && ShowFloor && !(_raidArena == RaidArena.Kind.Ring && _arenaConfident);
@@ -56,18 +60,22 @@ internal sealed partial class MechanicCalloutTracker
         foreach (var c in _floor)
         {
             c.TileUuid = 0; c.TileObj = null; c.HadTile = c.DummyDestroyed = c.DummyCracked = c.Pending = false;
-            c.State = FloorState.Unknown;
+            c.State = FloorState.Unknown; c.Y = float.NaN;
         }
         _floorTileCell.Clear(); _floorResetSeen.Clear(); _floorDummySeen.Clear();
-        _floorPasses = 0;
+        _floorPasses = 0; _floorGridY = float.NaN;
     }
 
-    private int CellOf(Vector3 p)
+    // offFloor = inside a cell's XZ range but on another floor than the local player (rejected by SameFloor only).
+    private int CellOf(Vector3 p, out bool offFloor)
     {
+        offFloor = false;
         int i = RaidArena.NearestCell(p.x, p.z);
         if (i < 0) return -1;
         float dx = p.x - RaidArena.Cells[i].X, dz = p.z - RaidArena.Cells[i].Z;
-        return dx * dx + dz * dz <= FloorCellRange * FloorCellRange && SameFloor(p.y) ? i : -1;
+        if (dx * dx + dz * dz > FloorCellRange * FloorCellRange) return -1;
+        if (!SameFloor(p.y)) { offFloor = true; return -1; }
+        return i;
     }
 
     // ── Wide pass (1 s, or ≤ 300 ms after a reset): type-3 floor tiles ───────────────────────────────────────
@@ -86,11 +94,16 @@ internal sealed partial class MechanicCalloutTracker
         int id = ReadMonsterId(obj);
         if (id == 0) return;                                          // not readable yet — retry next pass
         if (!FloorTileIds.Contains(id) || !TryReadPos(obj, out var p, out _)) { _floorTileCell[uuid] = -1; return; }
-        int cell = CellOf(p);
+        int cell = CellOf(p, out bool offFloor);
+        // A grid tile seen from another floor (local player in the ring arena, Y-only verdict keeps tracking on) is NOT
+        // cached as "not a floor tile" — that would orphan a tile (re)spawned during the ring phase forever, and its
+        // cell would read "tile gone" → Destroyed once back on the grid. Retry on a later pass instead.
+        if (offFloor) return;
         _floorTileCell[uuid] = cell;
         if (cell < 0) return;
         _floorSeenThisPass.Add(uuid);
         AttachTile(_floor[cell], uuid, obj, id);
+        _floor[cell].Y = _floorGridY = p.y;
     }
 
     private void AttachTile(FloorCell c, long uuid, object? obj, int id = 0)
@@ -113,10 +126,11 @@ internal sealed partial class MechanicCalloutTracker
         bool crack = id == DummyCrack, destroy = DummyDestroy.Contains(id), regen = id == DummyRegen;
         if ((!crack && !destroy && !regen) || _floorDummySeen.Contains(uuid)) return;
         if (!TryReadPos(obj, out var p, out _)) return;
-        int cell = CellOf(p);
+        int cell = CellOf(p, out _);
         if (cell < 0) return;                                         // retry next scan (e.g. floor filter not ready)
         _floorDummySeen.Add(uuid);
         var c = _floor[cell];
+        if (float.IsNaN(c.Y)) c.Y = p.y;                              // a tile's own Y (when mapped) wins
         if (regen) SetPending(c);
         else if (destroy) { c.DummyDestroyed = true; c.DummyCracked = false; c.Pending = false; }
         else c.DummyCracked = true;
@@ -189,6 +203,9 @@ internal sealed partial class MechanicCalloutTracker
     }
 
     // Minimap regions (drawn FIRST in BuildRaidMap, so Phase / Preset cells and dots stay on top).
+    // Only cells on the LOCAL player's floor (SameFloor vs the cell's tile Y): in the ring arena (Y≈35) the arena
+    // verdict is often Y-only, which deliberately does not hide grid regions — so the remembered grid damage (tiles at
+    // Y≈400) used to draw over the ring view. The state itself is kept; it shows again once back on the grid.
     private void AddFloorRegions()
     {
         if (!ShowFloor) return;
@@ -196,6 +213,8 @@ internal sealed partial class MechanicCalloutTracker
         {
             var st = _floor[i].State;
             if (st != FloorState.Cracked && st != FloorState.Destroyed) continue;
+            float y = float.IsNaN(_floor[i].Y) ? _floorGridY : _floor[i].Y;
+            if (!float.IsNaN(y) && !SameFloor(y)) continue;                              // unknown Y → draw
             var r = RaidArena.CellRect(i, 5);
             r.Style = st == FloorState.Cracked ? 1 : 2;
             _map.Regions.Add(r);
