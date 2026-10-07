@@ -8,8 +8,9 @@ namespace Stellar.RaidManager;
 // "On me": when the LOCAL player is among a new occurrence's targets (or joins an existing row's targets), a big
 // banner "<MECHANIC> — YOU" in the mechanic colour with a countdown appears on a HUD window (up to 3 stacked, newest
 // on top) and stays until the row ends (untimed mechanics: 5 s); optionally the built-in chime plays through
-// MechAudioPlayer (local speakers, winmm). Phase Mapping danger tiles get a "MOVE OFF" banner instead
-// (Plugin.MechanicAlerts.Banner.cs). Settings are the "Mechanic Alerts" section of the Mechanic Callouts window.
+// MechAudioPlayer (local speakers, winmm). Raid danger tiles (Phase Mapping, Edge-Mid / Corner Explosion) get a
+// "MOVE OFF" banner instead (Plugin.MechanicAlerts.Banner.cs). Settings are the "Mechanic Alerts" section of the
+// Mechanic Callouts window.
 // Config keys: mech_alert_on / _sound / _volume / _scale. (Experiment's custom sound file, untimed-duration slider
 // and voice callouts are deliberately not ported.)
 // The tracker must be polling for occurrences to fire — it runs while the list OR the minimap OR alerts are enabled.
@@ -43,8 +44,9 @@ public sealed partial class Plugin
 
     private void OnMechOccurrence(McOccurrence o)
     {
-        // Phase Mapping marks floor tiles, never a player — no on-me alert (the MOVE OFF banner covers it instead).
-        if (_alertOn && o.IsLocalTarget && o.Key != MechanicCalloutTracker.PhaseDangerKey) ShowOnMeAlert(o, testMs: 0);
+        // Danger tiles (Phase Mapping, Edge-Mid / Corner Explosion) mark the floor, never a player — no on-me alert
+        // (the MOVE OFF banner covers them instead).
+        if (_alertOn && o.IsLocalTarget && !MechanicCalloutTracker.IsDangerTileKey(o.Key)) ShowOnMeAlert(o, testMs: 0);
     }
 
     private void ShowOnMeAlert(McOccurrence o, long testMs)

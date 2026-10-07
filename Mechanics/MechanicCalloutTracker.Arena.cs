@@ -31,7 +31,7 @@ internal sealed partial class MechanicCalloutTracker
     private bool RaidRingGate(SceneDef def) =>
         def.Kind == SceneKind.Raid && _raidArena == RaidArena.Kind.Ring && _arenaConfident;
 
-    // Local player's world position this scan (every scene: arena filters, raid arena-by-Y, Phase Mapping MOVE OFF).
+    // Local player's world position this scan (every scene: arena filters, raid arena-by-Y, danger-tile MOVE OFF).
     private void UpdateLocalPos()
     {
         long local = _services.CombatSnapshot.LocalEntityId.Value;

@@ -108,7 +108,7 @@ public sealed partial class Plugin
         return false;
     }
 
-    // Slot 0 = the Phase Mapping MOVE OFF banner while it applies, then the on-me banners below it.
+    // Slot 0 = the danger-tile MOVE OFF banner while it applies, then the on-me banners below it.
     private Banner? BannerAt(int i)
     {
         var d = DangerBanner();
@@ -119,25 +119,28 @@ public sealed partial class Plugin
         return null;
     }
 
-    // "Phase Mapping — MOVE OFF <tile>": shown while the local player stands in a marked danger tile (tracker
-    // PhaseDangerCell — cheap: computed in the 200 ms scan). Plays the alert sound when it starts, at most every 3 s.
+    // "<mechanic> — MOVE OFF <tile>": shown while the local player stands in a marked danger tile — Phase Mapping,
+    // Edge-Mid Explosion or Corner Explosion (tracker LocalDanger* — cheap: computed in the 200 ms scan; precedence
+    // Phase Mapping → Edge-Mid → Corner when tiles overlap). Plays the alert sound when it starts, at most every 3 s.
     private Banner? _dangerBanner;
-    private string _dangerCell = "";
+    private string _dangerSig = "";              // key|cell the cached banner was built for ("" = none)
     private long _dangerSoundAt;
 
     private Banner? DangerBanner()
     {
         if (!_alertOn) return null;
-        string cell = _mechTracker.PhaseDangerCell;
-        if (cell.Length == 0) { _dangerCell = ""; return null; }
-        if (cell != _dangerCell || _dangerBanner == null)
+        string key = _mechTracker.LocalDangerKey, cell = _mechTracker.LocalDangerCell;
+        if (key.Length == 0) { _dangerSig = ""; return null; }
+        string sig = key + "|" + cell;
+        if (sig != _dangerSig || _dangerBanner == null)
         {
-            bool starting = _dangerCell.Length == 0;
-            _dangerCell = cell;
+            bool starting = _dangerSig.Length == 0;
+            _dangerSig = sig;
             _dangerBanner = new Banner
             {
-                Occ = new McOccurrence { Key = MechanicCalloutTracker.PhaseDangerKey, Color = 3, Row = new McRow() },
-                Headline = _loc.T("rm.mech.banner.moveOff"), Detail = cell,
+                Occ = new McOccurrence { Key = key, Color = 3, Row = new McRow() },
+                // Mechanic name via the shared rm.mech.n.* keys (McText.Names: phaseMapping / edgeMid / corner).
+                Headline = _loc.TFormat("rm.mech.banner.moveOff", McText.T(_mechTracker.LocalDangerName)), Detail = cell,
             };
             long now = Environment.TickCount64;
             if (starting && _alertSound && now - _dangerSoundAt > 3000) { _dangerSoundAt = now; PlayAlertSound(); }

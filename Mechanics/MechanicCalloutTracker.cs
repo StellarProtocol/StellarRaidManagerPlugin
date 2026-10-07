@@ -134,7 +134,7 @@ internal sealed partial class MechanicCalloutTracker : IDisposable
     {
         _rows.Clear(); _lines.Clear(); RowCount = 0;
         _mapValid = false;
-        PhaseDangerCell = "";
+        ClearLocalDanger();                  // left the raid / loading: no stale MOVE OFF banner
     }
 
     private void ResetScene()
@@ -142,7 +142,7 @@ internal sealed partial class MechanicCalloutTracker : IDisposable
         _names.Clear(); _rows.Clear(); _ents.Clear(); _buffs.Clear(); _firstSeen.Clear();
         ResetMonsterIds(); _mkSlotByKey.Clear(); _casts.Clear(); _castState.Clear(); _entColor.Clear(); _mapValid = false;
         ResetWide(); ResetOccurrences(); ResetPinballProbe(); ResetPinballBalls(); ResetExpiry(); ResetRing(); ResetFloor();
-        _raidArena = RaidArena.Kind.Unknown;
+        _raidArena = RaidArena.Kind.Unknown; ClearLocalDanger();
         McBuffEffectPatch.Clear();          // buff uuids are recycled across scenes (Buff-Tracking.md §8)
     }
 

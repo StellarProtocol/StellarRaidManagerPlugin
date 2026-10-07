@@ -44,6 +44,7 @@ internal static partial class McText
         ["Middle Ring"] = "rm.mech.n.middleRing",
         ["Outer Ring"] = "rm.mech.n.outerRing",
         ["Phase Mapping — Danger"] = "rm.mech.n.phaseDanger",
+        ["Phase Mapping"] = "rm.mech.n.phaseMapping",                   // danger-tile MOVE OFF banner headline
         ["Divine Scale - Preset Return"] = "rm.mech.n.presetReturn",
         ["Top Left"] = "rm.mech.n.topLeft",
         ["Top Middle"] = "rm.mech.n.topMid",

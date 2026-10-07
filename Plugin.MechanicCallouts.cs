@@ -12,7 +12,7 @@ namespace Stellar.RaidManager;
 // MechanicCalloutTracker*.cs) reads who carries which mechanic debuff and feeds three HUD windows:
 //   • the callout LIST  `● <mechanic>  <countdown>  <you>, <others>`        — Plugin.MechanicCalloutsHud.cs
 //   • the MINIMAP (arena, regions, team/boss dots, party markers)           — Plugin.MechanicMinimap.cs
-//   • the ON-ME banner ("<mechanic> — YOU", Phase Mapping MOVE OFF) + chime — Plugin.MechanicAlerts*.cs
+//   • the ON-ME banner ("<mechanic> — YOU", danger-tile MOVE OFF) + chime — Plugin.MechanicAlerts*.cs
 // Countdowns end at the HIT via a hardcoded per-mechanic offset table (Mechanics/MechanicCalloutTracker.HitOffset.cs;
 // tuned in the Experiment plugin, no user adjustment here).
 //
