@@ -101,6 +101,7 @@ internal sealed partial class MechanicCalloutTracker
                 _map.Regions.Add(r);
             }
             _map.Regions.AddRange(_raidPresetRegions);
+            AddCrystalRegions();                                        // crystals + pressed tiles, on top of 1F/2F/3F (Crystals.cs)
         }
         if (_raidArena == RaidArena.Kind.Ring && _arenaConfident) AddRingBand();   // latest ring band (Rules.Ring.cs)
         // Raid renders unlocalized; dot floor = the local player's (SameFloor). Pinball ball = slot 5, only while ARMED

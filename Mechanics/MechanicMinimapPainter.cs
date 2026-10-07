@@ -138,6 +138,7 @@ internal sealed class MechanicMinimapPainter : IDisposable
         if (reg.Kind == MinimapRegionKind.Sector)  { DrawSector(reg, c);  return; }
         if (reg.Kind == MinimapRegionKind.Polygon) { DrawPolygon(reg, c); return; }
         if (reg.Kind == MinimapRegionKind.Line)    { DrawLineRegion(reg, c); return; }
+        if (reg.Kind == MinimapRegionKind.Crystal) { DrawCrystal(reg); return; }
         var (ax, ay) = P(reg.X - reg.HalfX, reg.Z - reg.HalfZ);
         var (bx, by) = P(reg.X + reg.HalfX, reg.Z + reg.HalfZ);
         if (reg.Style != 0) { DrawFloorCell(reg.Style, ax, ay, bx, by); return; }
@@ -206,6 +207,7 @@ internal sealed class MechanicMinimapPainter : IDisposable
             _r.StrokeRect(x0 + i1, y0 + i1, x1 - i1, y1 - i1, K(2.5f), red, 1f);
             return;
         }
+        if (style == 4) { DrawPressedCell(x0, y0, x1, y1); return; }
         float lw = K(1.5f);
         if (style == 1)
         {
@@ -224,6 +226,38 @@ internal sealed class MechanicMinimapPainter : IDisposable
         _r.Line(x0 + i3, y0 + i3, x1 - i3, y1 - i3, K(2f), HoleEdge, 0.9f);
         _r.Line(x1 - i3, y0 + i3, x0 + i3, y1 - i3, K(2f), HoleEdge, 0.9f);
         _r.StrokeRect(x0, y0, x1, y1, lw, HoleEdge, 0.9f);
+    }
+
+    // Preset Return crystals (Crystals.cs). Colours avoid the raid's other meanings: 1F/2F/3F cells are palette yellow /
+    // GREEN / violet, danger is red, cracked amber, destroyed near-black — so "pressed" is a NEUTRAL slate tint with a
+    // pale-mint check in the cell's top-right corner (clear of the centred "1F" label, which stays readable when the
+    // pressed tile is also a Preset Return target: the overlay is drawn after it, light enough to keep its colour).
+    // Crystal glyph = pale-cyan diamond with a white outline (circles = players, triangles = monsters); dimmed once
+    // pressed while it is still present.
+    private static readonly ColorRgba PressedC = Rgba(148, 163, 184, 1f), CheckC = Rgba(187, 247, 208, 1f),
+                                      CrystalC = Rgba(165, 243, 252, 1f), Shadow = Rgba(10, 10, 12, 1f);
+
+    private void DrawPressedCell(float x0, float y0, float x1, float y1)
+    {
+        _r.FillRect(x0, y0, x1, y1, PressedC, 0.22f);
+        float i2 = K(2f);
+        _r.StrokeRect(x0 + i2, y0 + i2, x1 - i2, y1 - i2, K(1.5f), PressedC, 0.85f);
+        // ✓ in the top-right corner: short stroke down-right, long stroke up-right; dark under-stroke for contrast.
+        float s = K(5f), cx = x1 - K(11f), cy = y0 + K(10f);
+        float ax = cx - s, ay = cy, bx = cx - s * 0.3f, by = cy + s * 0.75f, ex = cx + s, ey = cy - s * 0.9f;
+        _r.Line(ax, ay, bx, by, K(4f), Shadow, 0.7f); _r.Line(bx, by, ex, ey, K(4f), Shadow, 0.7f);
+        _r.Line(ax, ay, bx, by, K(2.2f), CheckC, 1f); _r.Line(bx, by, ex, ey, K(2.2f), CheckC, 1f);
+    }
+
+    private void DrawCrystal(in MinimapRegion reg)
+    {
+        var (x, y) = P(reg.X, reg.Z);
+        float hw = K(5f), hh = K(7.5f), a = reg.Style == 1 ? 0.35f : 1f;
+        _r.FillTriangle(x, y - hh - K(1.5f), x + hw + K(1.5f), y, x - hw - K(1.5f), y, White, a * 0.9f);   // outline
+        _r.FillTriangle(x, y + hh + K(1.5f), x + hw + K(1.5f), y, x - hw - K(1.5f), y, White, a * 0.9f);
+        _r.FillTriangle(x, y - hh, x + hw, y, x - hw, y, CrystalC, a);
+        _r.FillTriangle(x, y + hh, x + hw, y, x - hw, y, CrystalC, a);
+        _r.Line(x - hw * 0.5f, y, x + hw * 0.5f, y, K(1f), White, a * 0.8f);                             // facet
     }
 
     // drawSectorRegion: centre + arc points every ≤ 8° (≥ 6 steps), point = (x + sin·r, z + cos·r); fill 0.24,

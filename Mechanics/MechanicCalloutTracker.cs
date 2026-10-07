@@ -141,7 +141,7 @@ internal sealed partial class MechanicCalloutTracker : IDisposable
     {
         _names.Clear(); _rows.Clear(); _ents.Clear(); _buffs.Clear(); _firstSeen.Clear();
         ResetMonsterIds(); _mkSlotByKey.Clear(); _casts.Clear(); _castState.Clear(); _entColor.Clear(); _mapValid = false;
-        ResetWide(); ResetOccurrences(); ResetPinballProbe(); ResetPinballBalls(); ResetExpiry(); ResetRing(); ResetFloor();
+        ResetWide(); ResetOccurrences(); ResetPinballProbe(); ResetPinballBalls(); ResetExpiry(); ResetRing(); ResetFloor(); ResetCrystals();
         _raidArena = RaidArena.Kind.Unknown; ClearLocalDanger();
         McBuffEffectPatch.Clear();          // buff uuids are recycled across scenes (Buff-Tracking.md §8)
     }

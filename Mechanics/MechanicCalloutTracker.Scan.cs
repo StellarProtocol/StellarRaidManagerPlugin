@@ -28,8 +28,11 @@ internal sealed partial class MechanicCalloutTracker
         bool probe = PinballProbeActive(def, now);
         bool floor = FloorTracking(def);               // raid grid floor damage (Floor.cs)
         if (floor && wide) FloorBeginPass();
+        // Preset Return crystals (Crystals.cs): type 3, walked every scan while one is present / a round runs.
+        bool crystals = CrystalTracking(def, MapEnabled);
+        bool walk = wide || probe || (crystals && CrystalScanHot());
 
-        foreach (long uuid in EntityUuids(localUuid, withMonsters, allTypes: wide || probe))
+        foreach (long uuid in EntityUuids(localUuid, withMonsters, allTypes: walk))
         {
             long type = (uuid >> 6) & 31;
             bool isPlayer = type == EntChar;
@@ -38,6 +41,7 @@ internal sealed partial class MechanicCalloutTracker
                 if (probe) ProbeEntity(uuid, null);
                 if (wide && def.Kind == SceneKind.Raid) RingDiscover(uuid);   // ring bodies of other types (Rules.Ring.cs)
                 if (floor && wide) FloorDiscover(uuid, type);
+                if (crystals && walk && type == 3) CrystalDiscover(uuid, now);
                 if (wide) WideCheck(uuid, null);
                 continue;
             }
@@ -75,10 +79,12 @@ internal sealed partial class MechanicCalloutTracker
         if (wide) EndWide();
         if (def.Kind == SceneKind.Raid) RingAddOthers(now);
         if (floor && wide) FloorEndPass();
+        if (crystals && walk) CrystalEndPass(now);
         _buffs.AddRange(_wideBuffs);                     // last wide pass's hits (≤ 1 s old) join the snapshot (all scenes)
         // After the wide merge: 829314's carrier is a scene object (type 3) only the wide scan sees.
         if (def.Kind == SceneKind.Raid) PinballProbeArm(now);   // 829314 seen → keep probing 8 s after
         if (floor) FloorUpdate();                      // tile buffs / reset signals → cell states
+        if (crystals) CrystalRoundUpdate(now);        // Preset Return round end → pressed crystals reset
     }
 
     // Reads ONE entity's full server buff list into _buffs (scene mechanic ids only).

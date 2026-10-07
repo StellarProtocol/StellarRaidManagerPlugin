@@ -33,7 +33,7 @@ internal sealed class MinimapView
 }
 
 // Upstream MechanicRegion kinds: rect / ring / sector / polygon / line.
-internal enum MinimapRegionKind { Rect, Ring, Sector, Polygon, Line }
+internal enum MinimapRegionKind { Rect, Ring, Sector, Polygon, Line, Crystal }   // Crystal = raid Preset Return crystal glyph (point)
 
 internal struct MinimapRegion
 {
@@ -47,6 +47,8 @@ internal struct MinimapRegion
     public string? Label;              // digits + 'F' / '?' only (the painter's bitmap font), e.g. "2F"
     public int   Style;                // Rect: 0 = mechanic cell, 1 = cracked floor (hatched), 2 = destroyed floor (dark + X),
                                        //       3 = DANGER no-go tile (red fill + hazard stripes + heavy outline; Phase Mapping / Explosions)
+                                       //       4 = Preset Return crystal PRESSED on this tile (grey tint + check mark, label-safe)
+                                       // Crystal: 1 = pressed but still present (dimmed glyph)
 
     public static MinimapRegion Ring(float rInner, float rOuter, int color) =>
         new() { Kind = MinimapRegionKind.Ring, RInner = rInner, ROuter = rOuter, Color = color };
@@ -62,6 +64,10 @@ internal struct MinimapRegion
 
     public static MinimapRegion Polygon(float[] xz, int color) =>
         new() { Kind = MinimapRegionKind.Polygon, Points = xz, Color = color };
+
+    // Raid Preset Return crystal at world x/z: a fixed-px painter glyph (size scales with the canvas, not the world).
+    public static MinimapRegion Crystal(float x, float z, bool pressed) =>
+        new() { Kind = MinimapRegionKind.Crystal, X = x, Z = z, Style = pressed ? 1 : 0 };
 }
 
 internal enum MinimapDotKind { Local, Teammate, Monster }
