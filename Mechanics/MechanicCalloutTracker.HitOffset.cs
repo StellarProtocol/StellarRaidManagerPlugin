@@ -27,7 +27,7 @@ internal sealed partial class MechanicCalloutTracker
         ["b829308"] = 2f,   // Spread
         ["b829305"] = 2f,   // Mirage Share
         ["b829309"] = 2f,   // Mirage Spread
-        ["b829307"] = 2f,   // Mirage Decay (user tuned by eye 2026-10-07) + release-backed real Decay (ReleaseMatch.cs)
+        ["b829307"] = 2f,   // Mirage Decay (user tuned by eye 2026-10-07)
         // Decay 829306 / Mirage Decay 829307 run to expiry in the logs → 0.
     };
 

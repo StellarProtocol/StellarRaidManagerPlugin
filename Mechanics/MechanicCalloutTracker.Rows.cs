@@ -72,7 +72,6 @@ internal sealed partial class MechanicCalloutTracker
     // ── Static table rows (MechanicCallouts.Data.cs) ─────────────────────────────────────────────────────────
     private void TableRows(SceneDef def)
     {
-        if (def.Kind == SceneKind.Raid) RecordReleases();   // boss release creates → real-vs-mirage (ReleaseMatch.cs)
         foreach (var b in _buffs)
         {
             if (!def.Buffs.TryGetValue(b.BaseId, out var d)) continue;
@@ -95,8 +94,6 @@ internal sealed partial class MechanicCalloutTracker
                 KeyMode.PerSource => $"{b.BaseId}:s{b.Fire}",
                 _                 => $"{b.BaseId}:{b.Layer}",
             };
-            // Raid mirage-id buff backed by its boss release buff = the REAL mechanic (ReleaseMatch.cs).
-            if (IsReleaseBacked(def, b, out var normal)) { d = normal; key += ":r"; }
             var a = Upsert(key, d.Group, d.AppendLayer ? $"{d.Label} x{b.Layer}" : d.Label, d.Color, d.Order, create, dur);
             // Only entities in our scan get named (upstream toMechanicTargets: target must be in its entity map) —
             // a wide-scan carrier (Raid WideScan.cs) yields a row/region without names.
