@@ -161,6 +161,22 @@ public sealed partial class Plugin
         return b.Detail.Length == 0 ? t : t.Length == 0 ? b.Detail : $"{b.Detail}   {t}";
     }
 
+    // Headline in bold via an inline rich-text tag — NOT Emphasis, which on the HudOverlay surface resets the
+    // DynamicFontSize (WindowBuilder-Patterns.md). The tag wraps the FINAL string (after localization + formatting),
+    // so a translation can never split or drop it. Cached per slot: the text lambda runs every refresh.
+    private readonly string?[] _bannerHeadSrc = new string?[AlertSlots], _bannerHeadBold = new string?[AlertSlots];
+
+    private string BoldHeadline(int slot, string text)
+    {
+        if (text.Length == 0) return "";
+        if (!ReferenceEquals(_bannerHeadSrc[slot], text) && _bannerHeadSrc[slot] != text)
+        {
+            _bannerHeadSrc[slot] = text;
+            _bannerHeadBold[slot] = "<b>" + text + "</b>";
+        }
+        return _bannerHeadBold[slot]!;
+    }
+
     private HudElement BuildAlertHudRoot()
     {
         var slots = new HudElement[AlertSlots];
@@ -170,7 +186,7 @@ public sealed partial class Plugin
             slots[s] = new ConditionalElement(() => ShownAt(i) != null,
                 new ColumnElement(new HudElement[]
                 {
-                    new TextElement(() => ShownAt(i) is { } h ? (h == SampleBanner ? SampleHeadline : h.Headline) : "",
+                    new TextElement(() => ShownAt(i) is { } h ? BoldHeadline(i, h == SampleBanner ? SampleHeadline : h.Headline) : "",
                         Color: () => (ColorRgba?)MechanicCalloutData.SlotColor(ShownAt(i) is { } b && b != SampleBanner ? b.Occ.Color : 3),
                         Width: BannerW, Align: TextAlign.Center, Shadow: true, NoWrap: true, ShadowDistance: 3)
                     { DynamicFontSize = () => (int)MathF.Round(28f * _alertScale) },
