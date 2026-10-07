@@ -162,8 +162,7 @@ public sealed partial class Plugin
         return row != null ? MechanicCalloutData.SlotColor(row.Color) : MechanicCalloutData.SlotColor(0);
     }
 
-    // "<color=#accent>You</color>, Alice, Bob" — local player first in the theme accent. NOT bold: the font has no bold
-    // face, so <b> is faux-bold (smeared copies) and with HudOverlay's drop shadow it looked blurry. uGUI Text has
+    // "<b><color=#accent>You</color></b>, Alice, Bob" — local player first in the theme accent, bold. uGUI Text has
     // supportRichText on by default (the framework only turns it off for text INPUTS). Cached per slot so the
     // per-refresh text poll doesn't allocate a new string every tick while nothing changed.
     private readonly string?[] _mechNameLocal = new string?[MechHudSlots], _mechNameOthers = new string?[MechHudSlots],
@@ -180,7 +179,7 @@ public sealed partial class Plugin
         if (_mechNameText[i] != null && _mechNameLocal[i] == row.LocalName && _mechNameOthers[i] == row.OtherNames
             && _mechNameAccent[i] == c && _mechNameWidth[i] == width && _mechNamePx[i] == px) return _mechNameText[i]!;
         string local = row.LocalName.Length > 0
-            ? $"<color=#{(int)(c.R * 255f):X2}{(int)(c.G * 255f):X2}{(int)(c.B * 255f):X2}>{row.LocalName}</color>" : "";
+            ? $"<b><color=#{(int)(c.R * 255f):X2}{(int)(c.G * 255f):X2}{(int)(c.B * 255f):X2}>{row.LocalName}</color></b>" : "";
         _mechNameLocal[i] = row.LocalName; _mechNameOthers[i] = row.OtherNames; _mechNameAccent[i] = c;
         _mechNameWidth[i] = width; _mechNamePx[i] = px;
         return _mechNameText[i] = WrapNames(local, row.OtherNames, width, px);
