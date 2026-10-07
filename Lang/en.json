@@ -94,6 +94,7 @@
   "rm.mech.hud.list": "Mechanic Callout List",
   "rm.mech.hud.map": "Mechanic Minimap",
   "rm.mech.intro": "Shows who is targeted by which boss mechanic in supported dungeons and raids — as a list, a minimap and an on-me alert.",
+  "rm.mech.list.bgOpacity": "Background opacity",
   "rm.mech.list.enable": "Show callout list",
   "rm.mech.list.order": "List order",
   "rm.mech.list.order.arrival": "Arrival order",

@@ -94,6 +94,7 @@
   "rm.mech.hud.list": "ギミック通知リスト",
   "rm.mech.hud.map": "ギミックミニマップ",
   "rm.mech.intro": "対応ダンジョン・レイドで、どのギミックが誰を対象にしているかをリスト・ミニマップ・自分対象アラートで表示します。",
+  "rm.mech.list.bgOpacity": "背景の不透明度",
   "rm.mech.list.enable": "通知リストを表示",
   "rm.mech.list.order": "リストの並び順",
   "rm.mech.list.order.arrival": "到着順",

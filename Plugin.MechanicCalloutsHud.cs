@@ -117,9 +117,28 @@ public sealed partial class Plugin
         RegisterMechCalloutHud();   // same id → saved position restored
     }
 
+    // "Background opacity" (config mech_bg_opacity, 0–100 %, step 5 %, default 0 = off): a black backdrop behind just
+    // the visible rows. Poll-diffed by the framework, so the slider is live with no re-register. Forced to 0 whenever
+    // there are no lines → never a blank box.
+    private float _mechBgOpacity;
+
+    private float MechBackdropOpacity() => MechHudLines().Count > 0 ? _mechBgOpacity : 0f;
+
+    private void SetMechBgOpacity(float v)
+    {
+        _mechBgOpacity = Math.Clamp(MathF.Round(v * 20f) / 20f, 0f, 1f);   // 5 % steps
+        _cfg.Set<float>("mech_bg_opacity", _mechBgOpacity);
+        _cfg.Save();
+    }
+
     private HudElement BuildMechHudRoot(float sc)
     {
-        var slots = new HudElement[MechHudSlots];
+        // Element 0 = the "Background opacity" backdrop. It stretches over THIS column only, and the column is
+        // content-sized (root VLG childForceExpandHeight off; a null slot collapses its whole no-Else Cond container),
+        // so it covers exactly the visible rows + Padding — never the locked-tall window rect, which is what
+        // WindowSpec.BackgroundOpacity would fill (a big blank box below the rows).
+        var slots = new HudElement[MechHudSlots + 1];
+        slots[0] = new BackdropElement(MechBackdropOpacity);
         for (int s = 0; s < MechHudSlots; s++)
         {
             int i = s;
@@ -150,7 +169,7 @@ public sealed partial class Plugin
                     { DynamicFontSize = () => MechFont(MechHudFont) }, Weight: 1f),
             }, Gap: MechHudGap * sc);
 
-            slots[s] = new ConditionalElement(() => MechLineAt(i) != null,
+            slots[s + 1] = new ConditionalElement(() => MechLineAt(i) != null,
                 new ConditionalElement(() => MechLineAt(i)?.Header != null, header, Else: row));
         }
         return new ColumnElement(slots, Gap: 3f * sc) { Padding = (int)MechHudPad };   // Passive root has 0 padding

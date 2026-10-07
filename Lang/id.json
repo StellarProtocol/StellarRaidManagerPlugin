@@ -94,6 +94,7 @@
   "rm.mech.hud.list": "Daftar Panggilan Mekanik",
   "rm.mech.hud.map": "Minimap Mekanik",
   "rm.mech.intro": "Menampilkan siapa yang menjadi target mekanik bos di dungeon dan raid yang didukung — sebagai daftar, minimap, dan peringatan saat kamu yang terkena.",
+  "rm.mech.list.bgOpacity": "Opasitas latar belakang",
   "rm.mech.list.enable": "Tampilkan daftar panggilan",
   "rm.mech.list.order": "Urutan daftar",
   "rm.mech.list.order.arrival": "Urutan kemunculan",

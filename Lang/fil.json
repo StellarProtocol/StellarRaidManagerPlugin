@@ -94,6 +94,7 @@
   "rm.mech.hud.list": "Listahan ng Tawag ng Mekaniko",
   "rm.mech.hud.map": "Minimap ng Mekaniko",
   "rm.mech.intro": "Ipinapakita kung sino ang tinatarget ng aling mekaniko ng boss sa mga suportadong dungeon at raid — bilang listahan, minimap, at alerto kapag ikaw ang tinamaan.",
+  "rm.mech.list.bgOpacity": "Opacity ng background",
   "rm.mech.list.enable": "Ipakita ang listahan ng tawag",
   "rm.mech.list.order": "Pagkakasunod ng listahan",
   "rm.mech.list.order.arrival": "Ayon sa pagdating",
