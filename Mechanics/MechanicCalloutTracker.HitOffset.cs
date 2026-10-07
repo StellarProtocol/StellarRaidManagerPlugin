@@ -28,7 +28,7 @@ internal sealed partial class MechanicCalloutTracker
         ["b829305"] = 2f,   // Mirage Share
         ["b829309"] = 2f,   // Mirage Spread
         ["b829307"] = 2f,   // Mirage Decay (user tuned by eye 2026-10-07)
-        // Decay 829306 / Mirage Decay 829307 run to expiry in the logs → 0.
+        // Decay 829306 runs to expiry in the logs → 0; P3 floor Decay 829325 → 0 too (default).
     };
 
     private readonly List<long> _biasSamples = new();

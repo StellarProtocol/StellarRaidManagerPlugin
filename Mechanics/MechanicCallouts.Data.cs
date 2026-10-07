@@ -91,12 +91,16 @@ internal static class MechanicCalloutData
         (829106, new(RaidEmp, "C", 2)),
         (829115, new(RaidShareMg, "Share",        0)),
         (829116, new(RaidShareMg, "Mirage Share", 3)),
-        // 829117 衰减 Decay / 829118 幻衰减 Mirage Decay (BuffTable) — the raid's REAL "normal Decay" lands right after
-        // Mirage Spread hits 0 (user, 2026-10-07); upstream resonance-logs-cn misses both. Same palette as 829304-829309.
+        // 829117 衰减 Decay / 829118 幻衰减 Mirage Decay (BuffTable) — kept as rows but NEVER observed in game. The real
+        // later P3 Decay (the one dropped on the floor / dodgeable) is 829325 连结试炼 (row below, next to 829306).
         (829117, new(RaidShareMg, "Decay",        1)),
         (829118, new(RaidShareMg, "Mirage Decay", 4)),
         (829304, new(RaidShare, "Share",  0)),
         (829306, new(RaidShare, "Decay",  1)),
+        // 829325 连结试炼 = the P3 floor Decay (15 s, 4 players, fire = boss): ~14 s after a Mirage Decay 829307 hits 0,
+        // or on its own near ball rounds (user video 2026-10-08). Own row (ByLayer key = <baseId>:<layer>, never merges
+        // with 829306); same label/palette as normal Decay. Hit offset 0 (default).
+        (829325, new(RaidShare, "Decay",  1)),
         (829308, new(RaidShare, "Spread", 2)),
         (829305, new(RaidMShare, "Mirage Share",  3)),
         (829307, new(RaidMShare, "Mirage Decay",  4)),
@@ -206,10 +210,12 @@ internal static class MechanicCalloutData
             new[] { 829104, 829105, 829106, 829115, 829116, 829117, 829118, 829214, 829215, 829217, 829226, 829227, 829228,
                     829245, 829304, 829305, 829306, 829307, 829308, 829309, 829314, 829316, 829318, 829323, 829324, 829326,
                     829327, 829328, 829329, 829330, 829331, 829332, 829372, 829373, 829374,
+                    // P3 floor Decay 连结试炼 (row)
+                    829325,
                     // boss "release" buffs = Share / Decay / Spread hit moment (no rows; Release.cs shows "NOW")
                     829310, 829311, 829312,
                     // NOT yet used (raid logs, data note only): 829238 death teleport to a living teammate (player) ·
-                    //   829320 时停 time stop (player) · 829321 渐隐 fade · 829325 连结试炼 Linked Trial (player) ·
+                    //   829320 时停 time stop (player) · 829321 渐隐 fade ·
                     //   829354 / 829357 / 829360 prayer-fountain nightmare phase 1 / 2 / 3 (player) · 829364 jet ·
                     //   829371 invisible / ignore collision · 829377 cannon mark · 829301 airflow FX · 829303 cannon
                     //   init · 829313 boss init · 829319 "grow bigger!"
