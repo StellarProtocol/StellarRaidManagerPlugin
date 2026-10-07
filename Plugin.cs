@@ -110,6 +110,9 @@ public sealed partial class Plugin : IStellarPlugin
 
         // Punctuate Mark Presets — save/reload dungeon marker layouts (Plugin.Marks*.cs).
         InitMarks();
+
+        // Mechanic Callouts — who got which boss mechanic: list, minimap, on-me alert (Plugin.MechanicCallouts.cs).
+        InitMechanicCallouts();
     }
 
     public void Dispose()
@@ -117,6 +120,7 @@ public sealed partial class Plugin : IStellarPlugin
         _services.Chat.MessageReceived -= _onMessage;
         _services.Framework.Update -= _onUpdate;
         DisposeMarks();
+        DisposeMechanicCallouts();
         _launcherEntry.Dispose();
         _settingsWindow.Remove();
         _hud.Remove();
