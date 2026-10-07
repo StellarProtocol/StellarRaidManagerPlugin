@@ -98,6 +98,8 @@ internal static class MechanicCalloutData
         (829304, new(RaidShare, "Share",  0)),
         (829306, new(RaidShare, "Decay",  1)),
         (829308, new(RaidShare, "Spread", 2)),
+        // 829305/829307/829309 backed by the boss release buff (829310/829311/829312 within ±1.5 s) are the REAL
+        // mechanic, shown with the 829304/829306/829308 defs above (MechanicCalloutTracker.ReleaseMatch.cs).
         (829305, new(RaidMShare, "Mirage Share",  3)),
         (829307, new(RaidMShare, "Mirage Decay",  4)),
         (829309, new(RaidMShare, "Mirage Spread", 5)),
