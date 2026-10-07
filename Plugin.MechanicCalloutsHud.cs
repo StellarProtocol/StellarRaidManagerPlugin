@@ -8,8 +8,8 @@ namespace Stellar.RaidManager;
 // The Mechanic Callouts HUD list (data: MechanicCalloutTracker). A borderless HUD-category window over a FIXED pool of
 // line slots (the element tree is fixed at registration — WindowBuilder-Patterns.md "pre-allocate slots"); each slot
 // shows either a group header or a row `[■] <label>  <countdown>  <you>, <others>` from the tracker's flattened Lines.
-// Renders only in-world, when enabled AND there are rows (or test rows are on); in layout-edit mode (enabled) it shows
-// sample rows to position. No BringToFront: it opens from hidden via ShouldRender and lands on top within its ZCat
+// Renders only in-world, when enabled AND there are rows; in layout-edit mode (enabled) it shows sample rows to
+// position (the only preview path). No BringToFront: it opens from hidden via ShouldRender and lands on top within its ZCat
 // naturally (CLAUDE.md rule 5).
 public sealed partial class Plugin
 {
@@ -49,7 +49,7 @@ public sealed partial class Plugin
                 Passive = true,
                 ShouldRender = () => _mechEnabled && MechInWorld
                                   && (_services.ClientState.UiState & GameUIState.Blocking) == 0
-                                  && (_services.Windows.IsLayoutEditing || _mechTestRows || _mechTracker.RowCount > 0),
+                                  && (_services.Windows.IsLayoutEditing || _mechTracker.RowCount > 0),
             },
             Root:    BuildMechHudRoot(),
             OnClose: () => { }));
@@ -57,11 +57,11 @@ public sealed partial class Plugin
         _mechHudWindow.SetVisible(true);   // always "shown"; ShouldRender does the real gating
     }
 
-    // Live rows when there are any; otherwise the sample list when test rows / layout edit want something to place.
+    // Live rows when there are any; otherwise the sample list while the layout editor wants something to place.
     private IReadOnlyList<McLine> MechHudLines()
     {
         if (_mechTracker.RowCount > 0) return _mechTracker.Lines;
-        return _mechTestRows || _services.Windows.IsLayoutEditing ? MechTestLines() : _mechTracker.Lines;
+        return _services.Windows.IsLayoutEditing ? MechTestLines() : _mechTracker.Lines;
     }
 
     private McLine? MechLineAt(int i)

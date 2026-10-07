@@ -44,7 +44,7 @@ public sealed partial class Plugin
                 Draggable = true, EditModeDragOnly = true, Closable = false, StartVisible = false, Passive = true,
                 ShouldRender = () => _mechMapEnabled && MechInWorld
                                   && (_services.ClientState.UiState & GameUIState.Blocking) == 0
-                                  && (_services.Windows.IsLayoutEditing || _mechTestRows || _mechTracker.Map != null),
+                                  && (_services.Windows.IsLayoutEditing || _mechTracker.Map != null),
             },
             Root: new ColumnElement(new HudElement[]
             {
@@ -136,16 +136,6 @@ public sealed partial class Plugin
         _services.Log.Warning($"[MechMap] paint failed: {ex.InnerException?.Message ?? ex.Message}");
     }
 
-    // Test map: the scene picked in the Mechanic Callouts window (MinimapTestViews.All, cycled by its button; the
-    // English name is localized at display via McText.T).
-    private int _mechMapTestIdx;
-    private string MechMapTestName => MinimapTestViews.All[_mechMapTestIdx].Name;
-
-    private void NextMechMapTest()
-    {
-        _mechMapTestIdx = (_mechMapTestIdx + 1) % MinimapTestViews.All.Length;
-        _mechMapPaintedVersion = int.MinValue;   // force a repaint of the new test view
-    }
-
-    private MinimapView MechMapTestView() => MinimapTestViews.All[_mechMapTestIdx].Build();
+    // Layout-edit preview (no live view): always the raid grid-arena sample.
+    private static MinimapView MechMapTestView() => MinimapTestViews.Raid();
 }

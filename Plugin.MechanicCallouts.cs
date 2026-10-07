@@ -26,7 +26,6 @@ public sealed partial class Plugin
     private readonly List<IWindowControl> _mechWindows = new();   // every mechanic window, Remove()d on dispose
 
     private bool _mechEnabled;      // callout list — off (and map + alert off) ⇒ no poll at all
-    private bool _mechTestRows;     // sample rows / test map so the HUDs can be positioned outside a dungeon
 
     // Mechanic windows render in-world only, never on a loading screen.
     private bool MechInWorld =>
@@ -36,7 +35,6 @@ public sealed partial class Plugin
     {
         McText.Loc = _loc;
         _mechEnabled  = _cfg.Get<bool>("mech_enabled", false);
-        _mechTestRows = _cfg.Get<bool>("mech_testrows", false);
 
         _mechTracker = new MechanicCalloutTracker(_services) { Cfg = _cfg };
         _mechWindow = _services.Windows.Register(new WindowRegistration(
@@ -104,12 +102,6 @@ public sealed partial class Plugin
             ApplyMechTrackerEnabled();
             SetMechBool("mech_map_enabled", v);
         }),
-        MechToggleRow("rm.mech.test", () => _mechTestRows, v =>
-        {
-            _mechTestRows = v;
-            SetMechBool("mech_testrows", v);
-        }),
-        new ButtonElement(() => _loc.TFormat("rm.mech.testMap", McText.T(MechMapTestName)), OnClick: NextMechMapTest),
         MechToggleRow("rm.mech.map.markers", () => _mechMapMarkers, v =>
         {
             _mechMapMarkers = v;
