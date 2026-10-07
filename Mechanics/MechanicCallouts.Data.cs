@@ -73,7 +73,7 @@ internal static class MechanicCalloutData
     // Edge-Mid / Corner Explosion 829214/829215 = DANGER tiles too (floor-targeted, ColourEntity=false; Minimap.cs Style 3).
     private const string RaidPhase   = "Phase";
     private const string RaidEmp     = "Electromagnetic Pulse";
-    private const string RaidShareMg = "Share / Mirage Share";
+    private const string RaidShareMg = "Share / Decay";
     private const string RaidShare   = "Share / Decay / Spread";
     private const string RaidMShare  = "Mirage Share / Decay / Spread";
     private const string RaidKill    = "Execution Sentence";
@@ -91,6 +91,10 @@ internal static class MechanicCalloutData
         (829106, new(RaidEmp, "C", 2)),
         (829115, new(RaidShareMg, "Share",        0)),
         (829116, new(RaidShareMg, "Mirage Share", 3)),
+        // 829117 衰减 Decay / 829118 幻衰减 Mirage Decay (BuffTable) — the raid's REAL "normal Decay" lands right after
+        // Mirage Spread hits 0 (user, 2026-10-07); upstream resonance-logs-cn misses both. Same palette as 829304-829309.
+        (829117, new(RaidShareMg, "Decay",        1)),
+        (829118, new(RaidShareMg, "Mirage Decay", 4)),
         (829304, new(RaidShare, "Share",  0)),
         (829306, new(RaidShare, "Decay",  1)),
         (829308, new(RaidShare, "Spread", 2)),
@@ -199,9 +203,9 @@ internal static class MechanicCalloutData
             new[] { 883707, 883708, 883709, 883710, 883714, 883601, 883602, 883603, 883605, 883631, 522602, 883633, 883634 },
             new[] { 4601, 4603, 4604, 4605, 4639, 3340219, 3340220, 3340227, 3340228, 1000 }, new[] { 4601 });
         Add("Forgotten Dreamwild (raid)", SceneKind.Raid, new[] { 13021, 13022, 13023 }, Raid,
-            new[] { 829104, 829105, 829106, 829115, 829116, 829214, 829215, 829217, 829226, 829227, 829228, 829245, 829304,
-                    829305, 829306, 829307, 829308, 829309, 829314, 829316, 829318, 829323, 829324, 829326, 829327, 829328,
-                    829329, 829330, 829331, 829332, 829372, 829373, 829374,
+            new[] { 829104, 829105, 829106, 829115, 829116, 829117, 829118, 829214, 829215, 829217, 829226, 829227, 829228,
+                    829245, 829304, 829305, 829306, 829307, 829308, 829309, 829314, 829316, 829318, 829323, 829324, 829326,
+                    829327, 829328, 829329, 829330, 829331, 829332, 829372, 829373, 829374,
                     // boss "release" buffs = Share / Decay / Spread hit moment (no rows; Release.cs shows "NOW")
                     829310, 829311, 829312,
                     // NOT yet used (raid logs, data note only): 829238 death teleport to a living teammate (player) ·

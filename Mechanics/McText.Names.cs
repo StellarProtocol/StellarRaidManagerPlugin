@@ -14,7 +14,7 @@ internal static partial class McText
         ["Edge-Mid Explosion"] = "rm.mech.n.edgeMid",
         ["Corner Explosion"] = "rm.mech.n.corner",
         ["Electromagnetic Pulse"] = "rm.mech.n.emp",
-        ["Share / Mirage Share"] = "rm.mech.n.shareMirageGroup",
+        ["Share / Decay"] = "rm.mech.n.shareDecayGroup",
         ["Share / Decay / Spread"] = "rm.mech.n.shareGroup",
         ["Mirage Share / Decay / Spread"] = "rm.mech.n.mirageShareGroup",
         ["Share"] = "rm.mech.n.share",
