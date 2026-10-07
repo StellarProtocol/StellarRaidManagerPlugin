@@ -36,7 +36,11 @@ public sealed partial class Plugin
         McText.Loc = _loc;
         _mechEnabled  = _cfg.Get<bool>("mech_enabled", false);
 
-        _mechTracker = new MechanicCalloutTracker(_services);
+        _mechTracker = new MechanicCalloutTracker(_services)
+        {
+            // "List order" (callout list only): 0 Arrival (default) / 1 Most urgent first / 2 Table order.
+            ListOrder = (MechanicCalloutTracker.ListOrderMode)Math.Clamp(_cfg.Get<int>("mech_order", 0), 0, 2),
+        };
         _mechWindow = _services.Windows.Register(new WindowRegistration(
             Spec: new WindowSpec(
                 Id: "raidmanager.mech.settings",
@@ -97,12 +101,28 @@ public sealed partial class Plugin
 
         // ── Callout List ──
         new TextElement(() => _loc.T("rm.mech.list.title"), Emphasis: true),
-        MechIndent(MechToggleRow("rm.mech.list.enable", () => _mechEnabled, v =>
-        {
-            _mechEnabled = v;
-            ApplyMechTrackerEnabled();
-            SetMechBool("mech_enabled", v);
-        })),
+        MechIndent(
+            MechToggleRow("rm.mech.list.enable", () => _mechEnabled, v =>
+            {
+                _mechEnabled = v;
+                ApplyMechTrackerEnabled();
+                SetMechBool("mech_enabled", v);
+            }),
+            new ConditionalElement(() => _mechEnabled, MechIndent(
+                new RowElement(new HudElement[]
+                {
+                    new TextElement(() => _loc.T("rm.mech.list.order")),
+                    new DropdownElement(
+                        Selected: () => (int)_mechTracker.ListOrder,
+                        Options:  () => Array.ConvertAll(MechOrderKeys, _loc.T),
+                        OnSelect: v =>
+                        {
+                            _mechTracker.ListOrder = (MechanicCalloutTracker.ListOrderMode)Math.Clamp(v, 0, 2);
+                            _cfg.Set<int>("mech_order", (int)_mechTracker.ListOrder);
+                            _cfg.Save();
+                        },
+                        Width: 220f),
+                }, Gap: 6f)))),
         new SeparatorElement(),
 
         // ── Minimap ──
@@ -146,6 +166,10 @@ public sealed partial class Plugin
         new SpacerElement(Width: 12f, Height: 0f),
         new CellElement(new ColumnElement(children, Gap: 8f), Weight: 1f),
     }, Gap: 6f);
+
+    // "List order" options, index = MechanicCalloutTracker.ListOrderMode.
+    private static readonly string[] MechOrderKeys =
+        { "rm.mech.list.order.arrival", "rm.mech.list.order.urgent", "rm.mech.list.order.table" };
 
     // Capsule toggle + sibling label (ToggleElement is capsule-only — same row shape as Plugin.Settings.cs).
     private HudElement MechToggleRow(string labelKey, Func<bool> get, Action<bool> set) =>

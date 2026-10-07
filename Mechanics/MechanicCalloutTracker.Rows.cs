@@ -121,7 +121,7 @@ internal sealed partial class MechanicCalloutTracker
         {
             var a = kv.Value;
             if (!_rows.TryGetValue(kv.Key, out var row))
-                _rows[kv.Key] = row = new McRow { Key = kv.Key, CreateMs = -1, DurationMs = -1 };
+                _rows[kv.Key] = row = new McRow { Key = kv.Key, CreateMs = -1, DurationMs = -1, Arrival = NextArrival() };
             row.Group = a.Group; row.Label = a.Label; row.Color = a.Color; row.Order = a.Order;
             if (row.CreateMs != a.CreateMs || row.StartTick != a.StartTick || row.DurationMs != a.DurMs)
             {
@@ -154,31 +154,7 @@ internal sealed partial class MechanicCalloutTracker
         row.OtherNames = string.Join(", ", others);
     }
 
-    // Groups by their lowest Order (table position; rules use 100+), rows inside by colour then label (upstream sort).
-    private void Flatten()
-    {
-        _lines.Clear();
-        var rows = new List<McRow>(_rows.Values);
-        var groupOrder = new Dictionary<string, int>();
-        foreach (var r in rows)
-            if (!groupOrder.TryGetValue(r.Group, out int o) || r.Order < o) groupOrder[r.Group] = r.Order;
-        rows.Sort((a, b) =>
-        {
-            int g = groupOrder[a.Group].CompareTo(groupOrder[b.Group]);
-            if (g != 0) return g;
-            int gs = string.CompareOrdinal(a.Group, b.Group);
-            if (gs != 0) return gs;
-            int c = a.Color.CompareTo(b.Color);
-            return c != 0 ? c : string.CompareOrdinal(a.Label, b.Label);
-        });
-        string? lastGroup = null;
-        foreach (var r in rows)
-        {
-            if (r.Group != lastGroup) { _lines.Add(new McLine(McText.T(r.Group))); lastGroup = r.Group; }
-            _lines.Add(new McLine(r));
-        }
-        RowCount = rows.Count;
-    }
+    // (Flatten — header + row lines in the selected list order: MechanicCalloutTracker.Order.cs.)
 
     // ── Clock ────────────────────────────────────────────────────────────────────────────────────────────────
     // Server clock = the framework's CombatSnapshot.ServerNowMs — NEVER the game's ZServerTime singleton

@@ -18,6 +18,7 @@ internal sealed class McRow
     public long   CreateMs, DurationMs;          // merged: min create (non-zero), max duration — upstream upsertRow
     public long   StartTick;                     // local-event rows (first-seen / skill cast): TickCount64 start
     public long   SnapTick;                      // Environment.TickCount64 at the last (re)snap
+    public long   Arrival;                       // arrival sequence (Order.cs) — set once when the row first appears
     public float  SnapRemain = -1f;              // seconds at SnapTick; -1 = no timer
     public string LocalName = "", OtherNames = "";
 
