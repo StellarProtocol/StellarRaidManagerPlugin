@@ -76,7 +76,7 @@
   "rm.raidWarning.channels": "레이드 경고 채널",
   "rm.raidWarning.enable": "레이드 경고 사용",
   "rm.raidWarning.help": "채팅에서 /rw <텍스트>를 사용하면 레이드 경고를 띄울 수 있습니다. 예: /rw 지금 모이세요!",
-  "rm.raidWarning.ingameDesc": "게임의 알림 시스템을 통해 공지 배너를 표시합니다.",
+  "rm.raidWarning.ingameDesc": "게임 공지 시스템을 통해 공지 배너를 표시합니다.",
   "rm.raidWarning.overlayDesc": "사용자 지정 오버레이를 5초간 표시합니다.",
   "rm.raidWarning.useIngame": "게임 내 경고 사용",
   "rm.size.large": "크게",
