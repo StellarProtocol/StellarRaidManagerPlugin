@@ -99,8 +99,8 @@ internal static class MechanicCalloutData
         (829306, new(RaidShare, "Decay",  1)),
         // 829325 连结试炼 = the P3 floor Decay (15 s, 4 players, fire = boss): ~14 s after a Mirage Decay 829307 hits 0,
         // or on its own near ball rounds (user video 2026-10-08). Own row (ByLayer key = <baseId>:<layer>, never merges
-        // with 829306); same label/palette as normal Decay. Hit offset 0 (default).
-        (829325, new(RaidShare, "Decay",  1)),
+        // with 829306); same palette/group as normal Decay, own label so the two are told apart. Hit offset 0 (default).
+        (829325, new(RaidShare, "Decay (Linked Trial)", 1)),
         (829308, new(RaidShare, "Spread", 2)),
         (829305, new(RaidMShare, "Mirage Share",  3)),
         (829307, new(RaidMShare, "Mirage Decay",  4)),

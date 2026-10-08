@@ -20,6 +20,7 @@ internal static partial class McText
         ["Share"] = "rm.mech.n.share",
         ["Mirage Share"] = "rm.mech.n.mirageShare",
         ["Decay"] = "rm.mech.n.decay",
+        ["Decay (Linked Trial)"] = "rm.mech.n.decayLinked",
         ["Spread"] = "rm.mech.n.spread",
         ["Mirage Decay"] = "rm.mech.n.mirageDecay",
         ["Mirage Spread"] = "rm.mech.n.mirageSpread",
