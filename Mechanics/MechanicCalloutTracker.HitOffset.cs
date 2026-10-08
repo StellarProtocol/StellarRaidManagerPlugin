@@ -31,6 +31,8 @@ internal sealed partial class MechanicCalloutTracker
         ["b829104"] = 2f,   // Electromagnetic Pulse A — buff removed at ~2 s left in every log (user approved 2026-10-08)
         ["b829105"] = 2f,   // Electromagnetic Pulse B
         ["b829106"] = 2f,   // Electromagnetic Pulse C
+        ["b829323"] = 2f,   // Divine Trick - Execution Sentence — explodes ~2 s before 0 (user, video 2026-10-08)
+        ["b829326"] = 2f,   // Divine Trick - Execution Sentence - Mirage
         // Decay 829306 runs to expiry in the logs → 0; P3 floor Decay 829325 → 0 too (default).
     };
 
