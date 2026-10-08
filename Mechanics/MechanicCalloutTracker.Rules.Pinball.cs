@@ -47,13 +47,42 @@ internal sealed partial class MechanicCalloutTracker
             if (e.MonsterId != PinballBallId) continue;
             var life = BallSighting(e.Uuid, now, entry);
             if (life.Ended) continue;
-            long start = Math.Max(life.Start, BallMoveStart(e, now));
+            long moveStart = BallMoveStart(e, now);
+            long start = Math.Max(life.Start, moveStart);
             if (start <= 0 || now - start >= BallDurMs) continue;   // unknown start / expired: hide (no 0.0 s row)
             if (BallRicocheted(e.Uuid, start)) { life.Ended = true; continue; }
             _ballArmed.Add(e.Uuid);
-            Upsert($"raid:pinball:ball:{e.Uuid}:{start}", "Pinball", "Ball", 5, 100, 0, BallDurMs, start);
+            Upsert(BallKey(e.Uuid, start), "Pinball", "Ball", 5, 100, 0, BallDurMs, start);
+            if (moveStart <= life.Start) BallRoundCheck(e.Uuid, start);   // spawn-armed (not a "moving" re-arm)
         }
     }
+
+    private static string BallKey(long uuid, long start) => $"raid:pinball:ball:{uuid}:{start}";
+
+    // ── On-me alert per ball ROUND (the 829316 ricochet banner came too late) ────────────────────────────────────
+    // There is no per-player pre-hit signal — the ricochet lands on 2-3 OR all 13 players — so every player is a
+    // potential target from the moment the pair appears. The FIRST ball of a round that arms on a spawn becomes the
+    // round's LEAD: its row's occurrence is flagged as a local target (DetectOccurrences), so the normal on-me path
+    // (banner "Pinball — YOU | Ball  N.Ns" + chime) runs once per round. The pair appears in the same scan; a ball
+    // starting within BallRoundJoinMs of the lead is the same round. The banner lives while the lead's row does: its
+    // 6 s run, or until its own ricochet ends the run early. "moving" re-arms never lead.
+    private const long BallRoundJoinMs = 1500;           // manual (Rule 12)
+    private long   _ballRoundStart;
+    private string _ballRoundLeadKey = "";
+
+    private void BallRoundCheck(long uuid, long start)
+    {
+        if (_ballRoundLeadKey.Length > 0 && start <= _ballRoundStart + BallRoundJoinMs) return;   // same round
+        _ballRoundStart = start;
+        _ballRoundLeadKey = BallKey(uuid, start);
+    }
+
+    /// <summary>The ball row that carries this round's on-me alert (everyone is a potential ricochet target).</summary>
+    private bool IsPinballRoundLead(string key) => _ballRoundLeadKey.Length > 0 && key == _ballRoundLeadKey;
+
+    /// <summary>Causal Jump Ricochet 829316 rows: no on-me banner — the ball round alert already covered it.</summary>
+    public static bool IsPinballRicochetKey(string? key) =>
+        key != null && (key == "829316" || key.StartsWith("829316:", StringComparison.Ordinal));
 
     // Records a sighting; a (re-)appearance after a real absence starts a new run.
     private BallLife BallSighting(long uuid, long now, bool entry)
@@ -111,5 +140,6 @@ internal sealed partial class MechanicCalloutTracker
     private void ResetPinballBalls()
     {
         _ballLife.Clear(); _ballMotion.Clear(); _ballArmed.Clear(); _ballSceneSeeded = false;
+        _ballRoundStart = 0; _ballRoundLeadKey = "";
     }
 }

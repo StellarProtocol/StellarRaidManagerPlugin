@@ -45,8 +45,10 @@ public sealed partial class Plugin
     private void OnMechOccurrence(McOccurrence o)
     {
         // Danger tiles (Phase Mapping, Edge-Mid / Corner Explosion) mark the floor, never a player — no on-me alert
-        // (the MOVE OFF banner covers them instead).
-        if (_alertOn && o.IsLocalTarget && !MechanicCalloutTracker.IsDangerTileKey(o.Key)) ShowOnMeAlert(o, testMs: 0);
+        // (the MOVE OFF banner covers them instead). Causal Jump Ricochet 829316 lands as the ball bounces — too
+        // late; the pinball round alert (lead ball row, flagged local by the tracker) already warned when the balls appeared.
+        if (_alertOn && o.IsLocalTarget && !MechanicCalloutTracker.IsDangerTileKey(o.Key)
+            && !MechanicCalloutTracker.IsPinballRicochetKey(o.Key)) ShowOnMeAlert(o, testMs: 0);
     }
 
     private void ShowOnMeAlert(McOccurrence o, long testMs)

@@ -77,7 +77,8 @@ internal sealed partial class MechanicCalloutTracker
             {
                 SceneId = SceneId, Scene = def.Kind, Key = row.Key, Group = row.Group, Label = row.Label,
                 Color = row.Color, DurationMs = row.DurationMs, LocalName = row.LocalName, OtherNames = row.OtherNames,
-                IsLocalTarget = row.LocalName.Length > 0, Row = row, InstanceKey = inst, LocalJoin = localJoin,
+                // Raid pinball: the round's lead ball row alerts everyone (Rules.Pinball.cs BallRoundCheck).
+                IsLocalTarget = row.LocalName.Length > 0 || IsPinballRoundLead(row.Key), Row = row, InstanceKey = inst, LocalJoin = localJoin,
             };
             try { Occurrence(o); }
             catch (Exception ex) { LogErrOnce("occurrence handler: " + ex.Message); }
