@@ -9,15 +9,16 @@ namespace Stellar.RaidManager;
 // the framework's MakeShadowedTextHud forces HorizontalWrapMode.Overflow even with NoWrap=false, and there is no
 // RectMask2D. Unlike the Menu text this list used before, a long player-name list would run past the window edge and a
 // long mechanic name into the timer. So:
-//   • names are broken BETWEEN names (",\n") against the names column's estimated width (window width − padding −
-//     fixed columns − row gaps; re-evaluated per refresh, so a window resize or Text size change re-wraps);
+//   • names are broken BETWEEN names (",\n") against the target-name line's estimated width (window width − padding −
+//     name-line indent; re-evaluated per refresh, so a window resize or Text size change re-wraps);
 //   • an over-long mechanic label is shortened with "…" to the label column.
 // Width is an ESTIMATE (no font metrics from a plugin): ≈0.58 em per Latin/Cyrillic glyph, 1 em from U+0E00 up
 // (Thai, CJK, kana — this list is localized into Thai and Japanese). It errs wide, so a line breaks a little early
 // rather than spilling. Rich-text tags (local-name accent, (safe)/(out) colour) are skipped when measuring.
 // Row stride vs text height: rows are laid out by the VLG from the texts' preferred heights (≈1.15–1.2 em: 14 px body
-// → ~17, 15 px header → ~18 at 1.0×), all scaled with Text size, inside a 21 px × scale stride budget; wrapped name
-// lines draw from the 6-line wrap reserve (18 px × scale each) in the locked height, so rows don't overlap.
+// → ~17, 15 px header → ~18 at 1.0×), all scaled with Text size, inside a 21 px × scale stride budget;
+// each row's target-name line draws from a 19 px × scale per-slot budget and extra wrapped name lines from the 4-line
+// wrap reserve (18 px × scale each) in the locked height, so rows don't overlap.
 public sealed partial class Plugin
 {
     private static float EstWidth(string s, float px)
@@ -33,16 +34,16 @@ public sealed partial class Plugin
         return em * px;
     }
 
-    // Names cell width: the window's live width minus the column padding, the fixed columns (swatch, label, two breaks,
-    // timer) and the row's five gaps, all at the registered scale. Floored so a tiny window still wraps sensibly.
+    // Target-name line width: the window's live width minus the column padding and the line's left indent (the names sit
+    // on their own line under the mechanic, so the swatch/label/timer columns no longer take from it), at the registered
+    // scale. Floored so a tiny window still wraps sensibly.
     private float MechNamesWidth()
     {
         float sc = _mechHudBuiltScale;
         float w = 0f;
         try { w = _mechHudWindow?.Rect.Width ?? 0f; } catch { }
         if (w <= 0f) w = MechHudMinWidth(sc);
-        float fixedW = (MechHudSwatchCell + MechHudLabelW + 2 * MechHudBreak + MechHudTimerW + 5 * MechHudGap) * sc;
-        return MathF.Max(60f * sc, w - 2 * MechHudPad - fixedW);
+        return MathF.Max(60f * sc, w - 2 * MechHudPad - MechHudNameIndent * sc);
     }
 
     // Greedy wrap between names: "<rich local>, Alice, Bob,\nCarol". Names are joined by ", " in the tracker.

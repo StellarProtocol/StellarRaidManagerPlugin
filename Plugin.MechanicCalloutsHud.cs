@@ -7,7 +7,8 @@ namespace Stellar.RaidManager;
 
 // The Mechanic Callouts HUD list (data: MechanicCalloutTracker). A borderless HUD-category window over a FIXED pool of
 // line slots (the element tree is fixed at registration — WindowBuilder-Patterns.md "pre-allocate slots"); each slot
-// shows either a group header or a row `[■] <label>  <countdown>  <you>, <others>` from the tracker's flattened Lines.
+// shows either a group header or a row `[■] <label>  <countdown>` with its targets `<you>, <others>` on an indented
+// line directly under it (no extra line when the row has no targets), from the tracker's flattened Lines.
 // Renders only in-world, when enabled AND there are rows; in layout-edit mode (enabled) it shows sample rows to
 // position (the only preview path). No BringToFront: it opens from hidden via ShouldRender and lands on top within its ZCat
 // naturally (CLAUDE.md rule 5).
@@ -29,14 +30,25 @@ public sealed partial class Plugin
 
     // Width-resizable: Resizable turns OFF the Borderless content-fit on BOTH axes and fixes the height (no width-only
     // option in WindowSpec), so the height is locked (MinHeight==MaxHeight) at a worst-case budget instead: padding +
-    // every slot at ~21f stride + room for ~6 wrapped name lines. It must not be too SHORT — under-height, the root
-    // VLG squeezes children toward their minHeight (Text min = 0) and rows overlap; extra height is just empty space
-    // below the top-stacked rows (root VLG is UpperLeft, childForceExpandHeight off).
+    // every slot at ~21f stride + a ~19f target-name line under every slot (worst case: all 16 slots are rows with
+    // targets) + room for ~4 wrapped name lines (the name line spans the full width, so it wraps less than the old
+    // right-hand column did). It must not be too SHORT — under-height, the root VLG squeezes children toward their
+    // minHeight (Text min = 0) and rows overlap; extra height is just empty space below the top-stacked rows (root
+    // VLG is UpperLeft, childForceExpandHeight off) and Passive, so it never blocks the game.
     // Sizes at Text size 1.0× (canvas units); every one but the outer padding is multiplied by the scale.
-    private const float MechHudPad = 20f /* column only — Passive root has none */, MechHudStride = 21f, MechHudWrapReserve = 6 * 18f;
+    private const float MechHudPad = 20f /* column only — Passive root has none */, MechHudStride = 21f,
+                        MechHudNameStride = 19f, MechHudWrapReserve = 4 * 18f;
     private const float MechHudLabelW = 300f;   // mechanic-name column (was 230; long th/fil names)
     private const float MechHudTimerW = 48f, MechHudSwatchCell = 14f, MechHudSwatch = 10f, MechHudBreak = 4f, MechHudGap = 6f;
-    private const float MechHudMinW = 550f, MechHudMaxW = 1200f;   // +70 with the label column: timer + names keep their width
+    private const float MechHudMinW = 550f, MechHudMaxW = 1200f;   // +70 with the label column
+    // Target-name line indent: swatch cell + row gap puts it under the label's first glyph, +12 (~2 spaces at 14 px) so
+    // it reads as belonging to the mechanic above rather than as another label.
+    private const float MechHudNameIndent = MechHudSwatchCell + MechHudGap + 12f;
+    // Target names (everyone but the local player) in a light blue that stays readable on the dark HUD. Applied as the
+    // TextElement Color, NOT an inline <color> tag: on HudOverlay the shadow twin copies inline tags and the span blurs
+    // (WindowBuilder-Patterns.md, framework fix `fix/hud-shadow-color-tags` not in 2.19.1). "You" (and any tagged
+    // (safe)/(out) name) keeps its own inline span, which overrides this base colour for just that name.
+    private static readonly ColorRgba MechNameBlue = new(0x6E / 255f, 0xC6 / 255f, 1f, 1f);   // #6EC6FF
     private const int   MechHudFont = 14, MechHudHeaderFont = 15;  // the Menu surface's own body / emphasis sizes
 
     private float _mechHudScale = 1f;          // live "Text size" (fonts follow it at once)
@@ -44,7 +56,8 @@ public sealed partial class Plugin
     private long  _mechHudRebuildAt;           // debounce deadline for the geometry re-register (0 = none pending)
     private IDisposable? _mechHudRebuildTick;
 
-    private float MechHudH(float s) => 2 * MechHudPad + (MechHudSlots * MechHudStride + MechHudWrapReserve) * s;
+    private float MechHudH(float s) =>
+        2 * MechHudPad + (MechHudSlots * (MechHudStride + MechHudNameStride) + MechHudWrapReserve) * s;
     private float MechHudMinWidth(float s) => 2 * MechHudPad + (MechHudMinW - 2 * MechHudPad) * s;
     private int   MechFont(int basePx) => Math.Max(8, (int)MathF.Round(basePx * _mechHudScale));
 
@@ -63,7 +76,7 @@ public sealed partial class Plugin
             {
                 Draggable = true, EditModeDragOnly = true, Closable = false, StartVisible = false,
                 Surface = SurfaceStyle.HudOverlay,   // live DynamicFontSize (Text size)
-                // Extra width goes only to the names column (the one Weight cell); swatch/label/timer are fixed.
+                // Extra width goes only to the target-name line (its one Weight cell); swatch/label/timer are fixed.
                 Resizable = true, MinWidth = minW, MaxWidth = MathF.Max(MechHudMaxW, minW), MinHeight = h, MaxHeight = h,
                 // Passive: the Borderless root carries a full-rect invisible raycast blocker, and with the locked tall
                 // height most of it is EMPTY — it would eat game clicks/camera drags over a big blank area mid-fight.
@@ -154,23 +167,34 @@ public sealed partial class Plugin
                     Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, NoWrap: true, FontSize: MechHudFont)
                     { DynamicFontSize = () => MechFont(MechHudFont) }, Width: MechHudLabelW * sc),
                 // Fixed 4f spacer + the 6f row gap on each side = a 16f break (at a bare 6f gap neighbouring columns
-                // read as one run of text in game). Same break again between the timer and the names.
+                // read as one run of text in game).
                 new SpacerElement(MechHudBreak * sc),
-                // Timer sits between label and names (names last) so a long name list can never run over it.
+                // Timer right after the fixed-width label, so its position doesn't depend on the targets.
                 new CellElement(new TextElement(() => MechTimer(i),
                     Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, NoWrap: true, FontSize: MechHudFont)
                     { DynamicFontSize = () => MechFont(MechHudFont) }, Width: MechHudTimerW * sc),
-                new SpacerElement(MechHudBreak * sc),
-                // Names LAST, filling the rest of the row. HudOverlay text never wraps by itself, so MechNames breaks
-                // the list between names (",\n") against the cell's estimated width (Plugin.MechanicCalloutsHud.Wrap.cs);
-                // the local name stays inline rich text (accent + bold) — two sibling Texts would both be squeezed.
-                new CellElement(new TextElement(() => MechNames(i),
-                    Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, FontSize: MechHudFont)
-                    { DynamicFontSize = () => MechFont(MechHudFont) }, Weight: 1f),
             }, Gap: MechHudGap * sc);
+            // Targets on their own indented line UNDER the mechanic, filling the rest of the width. HudOverlay text
+            // never wraps by itself, so MechNames breaks the list between names (",\n") against the line's estimated
+            // width (Plugin.MechanicCalloutsHud.Wrap.cs). Others are blue via the base Color; the local name stays
+            // inline rich text (accent + bold) — two sibling Texts would both be squeezed. A no-Else Conditional
+            // collapses entirely when there are no targets → no blank line, and the backdrop (which hugs the
+            // content-sized column) still covers exactly the visible lines.
+            var names = new RowElement(new HudElement[]
+            {
+                new SpacerElement(MechHudNameIndent * sc),
+                new CellElement(new TextElement(() => MechNames(i),
+                    Color: () => (ColorRgba?)MechNameBlue, Shadow: true, FontSize: MechHudFont)
+                    { DynamicFontSize = () => MechFont(MechHudFont) }, Weight: 1f),
+            });
+            var rowWithNames = new ColumnElement(new HudElement[]
+            {
+                row,
+                new ConditionalElement(() => MechHasNames(i), names),
+            }, Gap: 1f * sc);
 
             slots[s + 1] = new ConditionalElement(() => MechLineAt(i) != null,
-                new ConditionalElement(() => MechLineAt(i)?.Header != null, header, Else: row));
+                new ConditionalElement(() => MechLineAt(i)?.Header != null, header, Else: rowWithNames));
         }
         return new ColumnElement(slots, Gap: 3f * sc) { Padding = (int)MechHudPad };   // Passive root has 0 padding
     }
@@ -180,6 +204,8 @@ public sealed partial class Plugin
         var row = MechLineAt(i)?.Row;
         return row != null ? MechanicCalloutData.SlotColor(row.Color) : MechanicCalloutData.SlotColor(0);
     }
+
+    private bool MechHasNames(int i) => MechLineAt(i)?.Row is { } r && (r.LocalName.Length > 0 || r.OtherNames.Length > 0);
 
     // "<b><color=#accent>You</color></b>, Alice, Bob" — local player first in the theme accent, bold. uGUI Text has
     // supportRichText on by default (the framework only turns it off for text INPUTS). Cached per slot so the
@@ -218,8 +244,9 @@ public sealed partial class Plugin
     private List<McLine>? _mechTestLines;
     private string _mechTestLang = "";
 
-    // A small sample panel (two groups, local-first targets, one untimed row). Timers loop so it looks alive.
-    // Rebuilt on a language switch (labels/headers are localized when built).
+    // A small sample panel (two groups, local-first targets, one untimed row, one target-less row). Each row's targets
+    // render on the indented blue line under it; the target-less row shows no second line. Timers loop so it looks
+    // alive. Rebuilt on a language switch (labels/headers are localized when built).
     private IReadOnlyList<McLine> MechTestLines()
     {
         if (_mechTestLines == null || _mechTestLang != _loc.Language)
@@ -231,11 +258,13 @@ public sealed partial class Plugin
                 new(McText.T("Electromagnetic Pulse")),
                 new(MechTestRow("A", 0, 8000, you, "Alice")),
                 new(MechTestRow("B", 1, 8000, "", "Bob, Carol")),
-                // Long target list — exercises the names-cell wrap (must not run over the timer / window edge).
+                // Long target list — exercises the name-line wrap (must not run past the window edge).
                 new(MechTestRow(McText.T("Spread"), 0, 12000, you, "Alice, Bob, Carol, Dave, Erin, Frank, Grace, Heidi")),
                 new(McText.T("Execution Sentence")),
                 new(MechTestRow(McText.T("Execution Sentence") + " x2", 1, 15000, "", "Dave")),
                 new(MechTestRow(McText.T("Divine Trick - Execution Sentence"), 0, 0, you, "")),
+                // No targets → no name line (an existing localized mechanic name — no new text key).
+                new(MechTestRow(McText.T("Phase Mapping"), 1, 6000, "", "")),
             };
         }
         long now = Environment.TickCount64;
