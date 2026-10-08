@@ -165,7 +165,7 @@ internal sealed class MechanicMinimapPainter : IDisposable
         }
         var (ax, ay) = P(reg.X - reg.HalfX, reg.Z - reg.HalfZ);
         var (bx, by) = P(reg.X + reg.HalfX, reg.Z + reg.HalfZ);
-        if (reg.Style != 0) { DrawFloorCell(reg.Style, ax, ay, bx, by); return; }
+        if (reg.Style != 0) { DrawFloorCell(reg.Style, ax, ay, bx, by, reg.Label); return; }
         _r.FillRect(ax, ay, bx, by, c, 0.22f);
         _r.StrokeRect(MathF.Min(ax, bx), MathF.Min(ay, by), MathF.Max(ax, bx), MathF.Max(ay, by), K(1.5f), c, 0.9f);
         if (!string.IsNullOrEmpty(reg.Label))
@@ -210,7 +210,7 @@ internal sealed class MechanicMinimapPainter : IDisposable
     // danger tile (PhaseMapping.cs), drawn after floor damage.
     private static readonly ColorRgba CrackC = Rgba(245, 158, 11, 1f), HoleC = Rgba(8, 8, 10, 1f), HoleEdge = Rgba(120, 120, 130, 1f);
 
-    private void DrawFloorCell(int style, float ax, float ay, float bx, float by)
+    private void DrawFloorCell(int style, float ax, float ay, float bx, float by, string? label)
     {
         float x0 = MathF.Min(ax, bx), y0 = MathF.Min(ay, by), x1 = MathF.Max(ax, bx), y1 = MathF.Max(ay, by);
         if (style == 3)
@@ -231,7 +231,7 @@ internal sealed class MechanicMinimapPainter : IDisposable
             _r.StrokeRect(x0 + i1, y0 + i1, x1 - i1, y1 - i1, K(2.5f), red, 1f);
             return;
         }
-        if (style == 4) { DrawPressedCell(x0, y0, x1, y1); return; }
+        if (style == 4) { DrawPressedCell(x0, y0, x1, y1, label); return; }
         float lw = K(1.5f);
         if (style == 1)
         {
@@ -261,7 +261,7 @@ internal sealed class MechanicMinimapPainter : IDisposable
     private static readonly ColorRgba PressedC = Rgba(148, 163, 184, 1f), CheckC = Rgba(187, 247, 208, 1f),
                                       CrystalC = Rgba(165, 243, 252, 1f), Shadow = Rgba(10, 10, 12, 1f);
 
-    private void DrawPressedCell(float x0, float y0, float x1, float y1)
+    private void DrawPressedCell(float x0, float y0, float x1, float y1, string? order)
     {
         _r.FillRect(x0, y0, x1, y1, PressedC, 0.22f);
         float i2 = K(2f);
@@ -271,6 +271,12 @@ internal sealed class MechanicMinimapPainter : IDisposable
         float ax = cx - s, ay = cy, bx = cx - s * 0.3f, by = cy + s * 0.75f, ex = cx + s, ey = cy - s * 0.9f;
         _r.Line(ax, ay, bx, by, K(4f), Shadow, 0.7f); _r.Line(bx, by, ex, ey, K(4f), Shadow, 0.7f);
         _r.Line(ax, ay, bx, by, K(2.2f), CheckC, 1f); _r.Line(bx, by, ex, ey, K(2.2f), CheckC, 1f);
+        if (string.IsNullOrEmpty(order)) return;
+        // Press order "#N" on the check's row, just left of it (3 px gap): top band of the tile, so it never touches
+        // the crystal glyph or the "1F" label (both centred in the cell). Text scale 2.5 (12.5 px tall at base) — the
+        // raster's width formula (glyphs × 4 − 1) × scale gives its right edge exactly.
+        float ts = K(2.5f), w = (order!.Length * 4 - 1) * ts;
+        _r.Text(order, ax - K(3f) - w / 2f, cy, ts, CheckC, outline: true);
     }
 
     private void DrawCrystal(in MinimapRegion reg)

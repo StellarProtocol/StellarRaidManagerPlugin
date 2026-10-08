@@ -20,6 +20,9 @@ namespace Stellar.RaidManager;
 //     already pressed it (same create) never re-presses the next appearance.
 //   • Round end = no Preset Return count/link buff (829372/3/4, 829318) on anyone for 2 s → every pressed flag
 //     resets. A press outside a round (no buffs seen) shows at most 15 s (829314's own lifetime).
+//   • Press ORDER (#1, #2, … on the pressed tile): ranked by 829314's server CREATE time among the crystals still
+//     marked pressed — not by our detection tick, which ties when two presses land in the same scan. No counter to
+//     reset: it restarts whenever the pressed marks clear (round reset / crystals gone / 15 s out-of-round expiry).
 // The [MechCrystal] diagnostics live in the Experiment copy only.
 internal sealed partial class MechanicCalloutTracker
 {
@@ -134,18 +137,38 @@ internal sealed partial class MechanicCalloutTracker
         return false;
     }
 
-    // Minimap (inside BuildRaidMap's grid block, after the Preset Return cells): pressed tiles, then the crystal glyphs
+    // A pressed mark that still shows: in a round until the reset, outside one for 829314's 15 s.
+    private bool CrystalPressLive(Crystal c, long now) =>
+        c.Pressed && (_presetRoundActive || now - c.PressTick < CrystalPressShowMs);
+
+    // 1-based press order among the live pressed crystals, by 829314 CREATE (server ms); uuid breaks an exact tie so
+    // two crystals never share a number. A late-detected but earlier-created press slots in ahead on the next paint.
+    private int CrystalPressOrder(long uuid, Crystal c, long now)
+    {
+        int n = 1;
+        foreach (var kv in _crystals)
+        {
+            var o = kv.Value;
+            if (kv.Key == uuid || !CrystalPressLive(o, now)) continue;
+            if (o.PressCreate < c.PressCreate || (o.PressCreate == c.PressCreate && kv.Key < uuid)) n++;
+        }
+        return n;
+    }
+
+    // Minimap (inside BuildRaidMap's grid block, after the Preset Return cells): pressed tiles (Label "#N" = press
+    // order, drawn by the painter left of the check mark — numerals only, no localization), then the crystal glyphs
     // on top. Local floor only (SameFloor vs the crystal's Y).
     private void AddCrystalRegions()
     {
         long now = Environment.TickCount64;
         int done = 0;                                                 // cell bitmask: one pressed overlay per tile
-        foreach (var c in _crystals.Values)
+        foreach (var kv in _crystals)
         {
+            var c = kv.Value;
             if (!c.Pressed || c.Cell < 0 || !c.HasPos || !SameFloor(c.Pos.y) || (done & (1 << c.Cell)) != 0) continue;
-            if (!_presetRoundActive && now - c.PressTick >= CrystalPressShowMs) continue;
+            if (!CrystalPressLive(c, now)) continue;
             done |= 1 << c.Cell;
-            var r = RaidArena.CellRect(c.Cell, 0);
+            var r = RaidArena.CellRect(c.Cell, 0, "#" + CrystalPressOrder(kv.Key, c, now));
             r.Style = 4;
             _map.Regions.Add(r);
         }

@@ -193,10 +193,10 @@ internal sealed class MinimapRaster : IDisposable
         "111101101101111", "010110010010111", "111001111100111", "111001111001111", "101101111001001",
         "111100111001111", "111100111101111", "111001001001001", "111101111101111", "111101111001111",
     };
-    private const string GlyphF = "111100110100100", GlyphQ = "111001011000010";
+    private const string GlyphF = "111100110100100", GlyphQ = "111001011000010", GlyphHash = "101111101111101";  // '#' = raid crystal press order "#N"
 
     private static string? Glyph(char ch) =>
-        ch >= '0' && ch <= '9' ? Glyphs[ch - '0'] : ch == 'F' || ch == 'f' ? GlyphF : ch == '?' ? GlyphQ : null;
+        ch >= '0' && ch <= '9' ? Glyphs[ch - '0'] : ch == 'F' || ch == 'f' ? GlyphF : ch == '?' ? GlyphQ : ch == '#' ? GlyphHash : null;
 
     public void Digits(string text, float cx, float cy, float scale, ColorRgba c) => Text(text, cx, cy, scale, c, outline: true);
 
