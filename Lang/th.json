@@ -217,6 +217,8 @@
   "rm.mech.player": "ผู้เล่น {0}",
   "rm.mech.ring.inner": "วงใน",
   "rm.mech.ring.middle": "วงกลาง",
+  "rm.mech.ring.move": "ย้ายไป → {0}",
+  "rm.mech.ring.name": "วงแหวนแม่เหล็กไฟฟ้า",
   "rm.mech.ring.outer": "วงนอก",
   "rm.mech.ring.safe": "ปลอดภัย: {0}",
   "rm.mech.safe": "(ปลอดภัย)",

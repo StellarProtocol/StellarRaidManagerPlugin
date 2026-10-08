@@ -135,6 +135,7 @@ internal sealed partial class MechanicCalloutTracker : IDisposable
         _rows.Clear(); _lines.Clear(); RowCount = 0;
         _mapValid = false;
         ClearLocalDanger();                  // left the raid / loading: no stale MOVE OFF banner
+        ClearRingDanger();                   // … nor a stale ring MOVE banner
     }
 
     private void ResetScene()

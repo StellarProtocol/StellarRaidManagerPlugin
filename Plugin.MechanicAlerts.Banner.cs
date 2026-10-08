@@ -103,16 +103,18 @@ public sealed partial class Plugin
 
     private bool AnyBanner()
     {
-        if (DangerBanner() != null) return true;
+        if (DangerBanner() != null || RingBanner() != null) return true;
         foreach (var b in _banners) if (BannerLive(b)) return true;
         return false;
     }
 
-    // Slot 0 = the danger-tile MOVE OFF banner while it applies, then the on-me banners below it.
+    // Slot 0 = the danger-tile MOVE OFF banner while it applies, then the ring MOVE banner, then the on-me banners.
     private Banner? BannerAt(int i)
     {
         var d = DangerBanner();
         if (d != null) { if (i == 0) return d; i--; }
+        var r = RingBanner();                                   // ring MOVE banner next (Plugin.MechanicAlerts.Ring.cs)
+        if (r != null) { if (i == 0) return r; i--; }
         int k = 0;
         foreach (var b in _banners)
             if (BannerLive(b) && k++ == i) return b;

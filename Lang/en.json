@@ -217,6 +217,8 @@
   "rm.mech.player": "Player {0}",
   "rm.mech.ring.inner": "Inner",
   "rm.mech.ring.middle": "Middle",
+  "rm.mech.ring.move": "MOVE → {0}",
+  "rm.mech.ring.name": "Electromagnetic Ring",
   "rm.mech.ring.outer": "Outer",
   "rm.mech.ring.safe": "Safe: {0}",
   "rm.mech.safe": "(safe)",

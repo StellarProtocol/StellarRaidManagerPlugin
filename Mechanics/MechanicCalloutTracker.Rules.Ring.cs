@@ -125,6 +125,7 @@ internal sealed partial class MechanicCalloutTracker
         if (_ringWaves.Count > 6) _ringWaves.RemoveRange(0, _ringWaves.Count - 6);   // live mode: history only
         if (_ringNew.Count > 0) _ringLastNewTick = now;
         foreach (var w in _ringWaves) if (!w.Decided) RingDecide(w, now);
+        RingDangerCheck(now);                                          // Clash/Brutal MOVE warning (RingDanger.cs)
 
         if (_ringWaves.Count == 0) return;
         var shown = _ringWaves.Skip(Math.Max(0, _ringWaves.Count - 3)).ToList();
@@ -212,5 +213,6 @@ internal sealed partial class MechanicCalloutTracker
         _ringLastPresent.Clear(); _ringWaves.Clear(); _ringNew.Clear();
         _ringWaveNo = 0; _ringLastNewTick = 0; _ringLastWaveTick = 0;
         _ringCentreOk = false; _ringOther.Clear(); _ringIdTries.Clear();
+        ClearRingDanger();
     }
 }
