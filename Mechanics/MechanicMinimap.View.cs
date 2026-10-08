@@ -44,7 +44,7 @@ internal struct MinimapRegion
     public float X2, Z2, WidthPx;      // Line end + stroke width in px (0 → 2)
     public float[]? Points;            // Polygon: world x,z pairs
     public int   Color;                // palette slot (MechanicCalloutData.SlotColor)
-    public string? Label;              // digits + 'F' / '?' / '#' only (the painter's bitmap font), e.g. "2F"; Style 4 = press order "#N"
+    public string? Label;              // digits + 'F' / '?' / '#' only (the painter's bitmap font), e.g. "2F"; Style 4 = press order "N"
     public int   Style;                // Rect: 0 = mechanic cell, 1 = cracked floor (hatched), 2 = destroyed floor (dark + X),
                                        //       3 = DANGER no-go tile (red fill + hazard stripes + heavy outline; Phase Mapping / Explosions)
                                        //       4 = Preset Return crystal PRESSED on this tile (grey tint + check mark, label-safe)

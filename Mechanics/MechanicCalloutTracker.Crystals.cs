@@ -155,7 +155,7 @@ internal sealed partial class MechanicCalloutTracker
         return n;
     }
 
-    // Minimap (inside BuildRaidMap's grid block, after the Preset Return cells): pressed tiles (Label "#N" = press
+    // Minimap (inside BuildRaidMap's grid block, after the Preset Return cells): pressed tiles (Label "N" = press
     // order, drawn by the painter left of the check mark — numerals only, no localization), then the crystal glyphs
     // on top. Local floor only (SameFloor vs the crystal's Y).
     private void AddCrystalRegions()
@@ -168,7 +168,7 @@ internal sealed partial class MechanicCalloutTracker
             if (!c.Pressed || c.Cell < 0 || !c.HasPos || !SameFloor(c.Pos.y) || (done & (1 << c.Cell)) != 0) continue;
             if (!CrystalPressLive(c, now)) continue;
             done |= 1 << c.Cell;
-            var r = RaidArena.CellRect(c.Cell, 0, "#" + CrystalPressOrder(kv.Key, c, now));
+            var r = RaidArena.CellRect(c.Cell, 0, CrystalPressOrder(kv.Key, c, now).ToString());
             r.Style = 4;
             _map.Regions.Add(r);
         }
