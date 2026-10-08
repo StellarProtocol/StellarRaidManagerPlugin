@@ -7,13 +7,15 @@ namespace Stellar.RaidManager;
 
 // Raid "Divine Scale - Preset Return" CRYSTALS (Mechanic-Callouts.md "Preset Return crystals"): SceneObjects
 // (EntSceneObject 3) 3540-3543 "时空之晶" appear on the grid when Preset Return starts; touching one runs the server's
-// teleport_to_pointA..D + AddBuffToTarget 829314 (15 s "交互后倒计时") ON THE CRYSTAL, then the crystal disappears.
+// teleport_to_pointA..D + AddBuffToTarget 829314 (15 s "交互后倒计时") ON THE CRYSTAL. The pressed crystal STAYS.
 // Minimap: a crystal glyph at each present crystal, and its tile marked PRESSED (grey + check) once it was touched —
 // EVERY crystal, independent of the Preset Return rows (a crystal off the 1F/2F/3F tiles can be pressed too).
 //   • Discovery: type 3 is only walked on the 1 s wide pass / pinball probe — and, while a crystal is present or a
 //     Preset Return buff is up, on EVERY scan (CrystalScanHot), so "gone" is judged per 200 ms pass, not per second.
-//   • Pressed = 829314 seen on the crystal OR the crystal leaving the scan after it was seen present — same robust
-//     gone rule as the pooled pinball balls (≥ 3 missed walking passes AND ≥ 1 s absent).
+//   • Pressed = 829314 seen on the crystal, and ONLY that (its fire uuid is the crystal itself, so the presser is
+//     unknown). Log (2 rounds): a pressed crystal stays in the scan; all 4 leave TOGETHER at round end with the Preset
+//     Return buffs — so "gone" is NOT a press (inferring it marked the never-pressed ones). Gone = round over for that
+//     crystal → its pressed mark clears (pinball gone rule: ≥ 3 missed walking passes AND ≥ 1 s absent).
 //   • Pooled like the balls: a gone uuid that re-appears is a NEW round → unpressed again. An 829314 instance that
 //     already pressed it (same create) never re-presses the next appearance.
 //   • Round end = no Preset Return count/link buff (829372/3/4, 829318) on anyone for 2 s → every pressed flag
@@ -79,7 +81,8 @@ internal sealed partial class MechanicCalloutTracker
         }
     }
 
-    // After a walking pass: misses + the gone rule (gone after it was present = pressed, when no buff said so first).
+    // After a walking pass: misses + the gone rule. Gone = the round ended (all 4 vanish together), NOT a press — the
+    // pressed mark goes with the crystal.
     private void CrystalEndPass(long now)
     {
         foreach (var kv in _crystals)
@@ -89,7 +92,7 @@ internal sealed partial class MechanicCalloutTracker
             c.Misses++;
             if (c.Misses < CrystalGoneMisses || now - c.LastSeen < CrystalGoneMs) continue;
             c.Gone = true;
-            if (!c.Pressed) { c.Pressed = true; c.PressTick = now; }
+            c.Pressed = false;
         }
         _crystalSeenPass.Clear();
     }
