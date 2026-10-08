@@ -57,7 +57,7 @@ internal sealed partial class MechanicCalloutTracker
 
         McEnt? vertical = null, horizontal = null;
         string? verticalLabel = null, horizontalLabel = null;
-        foreach (var (wave, label, color, key) in new[] { (ice, "Ice Wave Safe", 7, "ice"), (sea, "Sea Wave Safe", 4, "water") })
+        foreach (var (wave, label, color, key) in new[] { (ice, "Ice Wave Safe", MechanicCalloutData.IceSlot, "ice"), (sea, "Sea Wave Safe", MechanicCalloutData.WaterSlot, "water") })
         {
             if (wave == null) continue;
             bool isVertical = IsVerticalFacing(wave.Facing);
