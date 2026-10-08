@@ -14,7 +14,7 @@ internal sealed partial class MechanicCalloutTracker
     private const int ReefMatrixMonster = 4639, ReefBoss = 4601;
     private const int ReefIceWave = 3340219, ReefSeaWave = 3340220, ReefPizzaSkill = 3340245;
     private static readonly Dictionary<int, int> ReefOrbColor = new()
-    { [4604] = MechanicCalloutData.IceSlot, [4605] = MechanicCalloutData.WaterSlot };   // ice ball / bubble (blue/cyan exception)
+    { [4604] = MechanicCalloutData.IceSlot, [4605] = MechanicCalloutData.WaterSlot };   // ice ball / bubble (white/cyan exception)
 
     private void BuildReefMap()
     {

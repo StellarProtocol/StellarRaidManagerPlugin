@@ -46,9 +46,10 @@ internal static class MechanicCalloutData
     // teal borderline. NARROWED (user, 2026-10-08): no blue/white only for mechanics that highlight a player; Ice/Water
     // and non-player objects/zones (towers, portals, chain monsters, orbs, crystals, tiles, ring safe areas) may be
     // blue/cyan/white. Those use the slots appended after the 12 BASE slots — BlueSlot (upstream 7) / CyanSlot
-    // (upstream 4); IceSlot / WaterSlot are the same slots, named for the element. Never point a player-highlighting
+    // (upstream 4) / IceSlot (white). WaterSlot is the cyan slot named for the element; Ice = white, its own slot
+    // (user, 2026-10-08), so Ice no longer shares blue with the towers/portals. Never point a player-highlighting
     // mechanic at them.
-    internal const int BaseSlots = 12, BlueSlot = 12, CyanSlot = 13, IceSlot = BlueSlot, WaterSlot = CyanSlot;
+    internal const int BaseSlots = 12, BlueSlot = 12, CyanSlot = 13, IceSlot = 14, WaterSlot = CyanSlot;
     internal static readonly ColorRgba[] Palette =
     {
         Rgb(0xFACC15), // 0 yellow
@@ -63,16 +64,17 @@ internal static class MechanicCalloutData
         Rgb(0xA855F7), // 9 purple
         Rgb(0x14B8A6), // 10 teal
         Rgb(0xF59E0B), // 11 amber
-        Rgb(0x3B82F6), // 12 BlueSlot (= IceSlot)   blue (upstream 7) — Ice/Water + non-player only
-        Rgb(0x06B6D4), // 13 CyanSlot (= WaterSlot) cyan (upstream 4) — Ice/Water + non-player only
+        Rgb(0x3B82F6), // 12 BlueSlot               blue (upstream 7) — non-player only
+        Rgb(0x06B6D4), // 13 CyanSlot (= WaterSlot) cyan (upstream 4) — Water + non-player only
+        Rgb(0xFFFFFF), // 14 IceSlot                white — Ice only (user, 2026-10-08)
     };
 
     // 0xRRGGBB → opaque ColorRgba (explicit floats; avoids depending on FromHex's byte order).
     private static ColorRgba Rgb(uint hex) =>
         new(((hex >> 16) & 0xFF) / 255f, ((hex >> 8) & 0xFF) / 255f, (hex & 0xFF) / 255f, 1f);
 
-    // In-range slots (incl. the Blue/Cyan slots) map directly; anything else wraps over the 12 BASE slots
-    // only, so a cycling/out-of-range index can never land on the blue/cyan slots by accident.
+    // In-range slots (incl. the Blue/Cyan/Ice slots 12..14) map directly; anything else wraps over the 12 BASE slots
+    // only, so a cycling/out-of-range index can never land on the blue/cyan/white slots by accident.
     internal static ColorRgba SlotColor(int slot)
     {
         if ((uint)slot < (uint)Palette.Length) return Palette[slot];
