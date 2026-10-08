@@ -32,12 +32,15 @@ public sealed partial class Plugin
     // option in WindowSpec), so the height is locked (MinHeight==MaxHeight) at a worst-case budget instead: padding +
     // every slot at ~21f stride + a ~19f target-name line under every slot (worst case: all 16 slots are rows with
     // targets) + room for ~4 wrapped name lines (the name line spans the full width, so it wraps less than the old
-    // right-hand column did). It must not be too SHORT — under-height, the root VLG squeezes children toward their
-    // minHeight (Text min = 0) and rows overlap; extra height is just empty space below the top-stacked rows (root
-    // VLG is UpperLeft, childForceExpandHeight off) and Passive, so it never blocks the game.
+    // right-hand column did) + the after-names gap under every slot. It must not be too SHORT — under-height, the root
+    // VLG squeezes children toward their minHeight (Text min = 0) and rows overlap; extra height is just empty space
+    // below the top-stacked rows (root VLG is UpperLeft, childForceExpandHeight off) and Passive, so it never blocks the game.
     // Sizes at Text size 1.0× (canvas units); every one but the outer padding is multiplied by the scale.
     private const float MechHudPad = 20f /* column only — Passive root has none */, MechHudStride = 21f,
                         MechHudNameStride = 19f, MechHudWrapReserve = 4 * 18f;
+    // Extra space BELOW a target-name line (user: rows with names ran into the next mechanic). Only rows that have a
+    // name line get it, and not the last visible line (the backdrop hugs the column, so a trailing gap would be blank).
+    private const float MechHudNameGap = 6f;
     private const float MechHudLabelW = 300f;   // mechanic-name column (was 230; long th/fil names)
     private const float MechHudTimerW = 48f, MechHudSwatchCell = 14f, MechHudSwatch = 10f, MechHudBreak = 4f, MechHudGap = 6f;
     private const float MechHudMinW = 550f, MechHudMaxW = 1200f;   // +70 with the label column
@@ -57,7 +60,7 @@ public sealed partial class Plugin
     private IDisposable? _mechHudRebuildTick;
 
     private float MechHudH(float s) =>
-        2 * MechHudPad + (MechHudSlots * (MechHudStride + MechHudNameStride) + MechHudWrapReserve) * s;
+        2 * MechHudPad + (MechHudSlots * (MechHudStride + MechHudNameStride + MechHudNameGap) + MechHudWrapReserve) * s;
     private float MechHudMinWidth(float s) => 2 * MechHudPad + (MechHudMinW - 2 * MechHudPad) * s;
     private int   MechFont(int basePx) => Math.Max(8, (int)MathF.Round(basePx * _mechHudScale));
 
@@ -187,10 +190,19 @@ public sealed partial class Plugin
                     Color: () => (ColorRgba?)MechNameBlue, Shadow: true, FontSize: MechHudFont)
                     { DynamicFontSize = () => MechFont(MechHudFont) }, Weight: 1f),
             });
+            // Name line + the MechHudNameGap spacer under it (Gap 0 → the spacer adds exactly its height). The spacer is
+            // skipped when this is the last visible line (nothing below to separate from) — i+1 past the slot pool
+            // counts as last too, since those lines aren't shown.
+            var namesWithGap = new ColumnElement(new HudElement[]
+            {
+                names,
+                new ConditionalElement(() => i + 1 < MechHudSlots && MechLineAt(i + 1) != null,
+                    new SpacerElement(Height: MechHudNameGap * sc)),
+            }, Gap: 0f);
             var rowWithNames = new ColumnElement(new HudElement[]
             {
                 row,
-                new ConditionalElement(() => MechHasNames(i), names),
+                new ConditionalElement(() => MechHasNames(i), namesWithGap),
             }, Gap: 1f * sc);
 
             slots[s + 1] = new ConditionalElement(() => MechLineAt(i) != null,
