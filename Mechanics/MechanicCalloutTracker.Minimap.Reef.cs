@@ -33,7 +33,7 @@ internal sealed partial class MechanicCalloutTracker
     }
 
     // ── Matrix arena (buildMatrixMechanicView) ───────────────────────────────────────────────────────────────
-    // Rune buffs 883707-883710 colour their matrix (A green 1, B blue 7, C pink 6, D yellow 0). Each 522602 callout
+    // Rune buffs 883707-883710 colour their matrix (A green 1, B brown 7 (upstream blue), C pink 6, D yellow 0). Each 522602 callout
     // draws a 10 px beam from its SOURCE matrix through the target, extended to 48 units.
     private void ReefMatrixRegions(MinimapArenaSpec spec)
     {

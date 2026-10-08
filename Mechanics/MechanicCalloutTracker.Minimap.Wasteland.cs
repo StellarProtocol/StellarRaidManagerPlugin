@@ -61,7 +61,7 @@ internal sealed partial class MechanicCalloutTracker
                 _map.Regions.Add(MinimapRegion.Line(e.Pos.x, e.Pos.z, target.Pos.x, target.Pos.z, c, 3f));
         }
 
-        // Near/far chain (addChainRows): chain monsters marked near (884609) orange 5 / far (884610) cyan 4; a chain
+        // Near/far chain (addChainRows): chain monsters marked near (884609) orange 5 / far (884610) magenta 4; a chain
         // monster casting its hit in the last 4 s takes that hit's colour.
         foreach (var b in _buffs)
         {

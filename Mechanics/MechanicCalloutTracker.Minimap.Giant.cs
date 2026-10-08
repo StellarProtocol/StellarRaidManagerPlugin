@@ -1,7 +1,7 @@
 namespace Stellar.RaidManager;
 
 // Towering Ruin minimap — port of scenes/s3-giant-tower/{arena.ts, index.ts, mechanics.ts}: arena outline + portal ring,
-// no regions (upstream `regions: []`). The correct portal (2106) is pink 6, the other portal (2107) blue 7; the boss
+// no regions (upstream `regions: []`). The correct portal (2106) is pink 6, the other portal (2107) brown 7 (upstream blue); the boss
 // (Kartgriff) draws as the boss marker; Sticky Bomb targets colour through their rows.
 internal sealed partial class MechanicCalloutTracker
 {

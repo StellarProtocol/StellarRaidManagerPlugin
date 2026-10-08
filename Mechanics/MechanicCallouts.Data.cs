@@ -38,17 +38,20 @@ internal static class MechanicCalloutData
         public bool    ColourEntity { get; init; } = true;
     }
 
-    // 12-slot palette, same order as upstream colors.ts so a colorSlot index means the same colour as there.
+    // 12-slot palette, same order as upstream colors.ts so a colorSlot index means the same colour as there — EXCEPT
+    // NO BLUE and NO WHITE: the minimap draws teammates as sky-blue dots and the local player white, so a blue/cyan or
+    // white mechanic reads as a player. Upstream 4 cyan 06B6D4 → magenta, 7 blue 3B82F6 → brown (same indices, so
+    // data rows keep working; 7 is brown not magenta because Giant pairs it with pink 6). 2 violet / 10 teal borderline.
     internal static readonly ColorRgba[] Palette =
     {
         Rgb(0xFACC15), // 0 yellow
         Rgb(0x22C55E), // 1 green
         Rgb(0x8B5CF6), // 2 violet
         Rgb(0xEF4444), // 3 red
-        Rgb(0x06B6D4), // 4 cyan
+        Rgb(0xD946EF), // 4 magenta (was cyan 06B6D4 — no blue)
         Rgb(0xF97316), // 5 orange
         Rgb(0xEC4899), // 6 pink
-        Rgb(0x3B82F6), // 7 blue
+        Rgb(0xB45309), // 7 brown  (was blue 3B82F6 — no blue)
         Rgb(0x84CC16), // 8 lime
         Rgb(0xA855F7), // 9 purple
         Rgb(0x14B8A6), // 10 teal

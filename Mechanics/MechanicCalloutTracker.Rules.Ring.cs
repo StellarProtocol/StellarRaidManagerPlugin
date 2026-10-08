@@ -25,7 +25,7 @@ namespace Stellar.RaidManager;
 //   • reset (preview): a fresh body ≥ 10 s after the last one (= a NEW preview), or 40 s hold after the last wave. NOT
 //     on despawn: the preview bodies vanish right before the explode phase, exactly when players need the row.
 //     Reset (live): no fresh body for 10 s, or none present and none fresh for 3 s.
-//   • row: "Safe: <last 3 safe rings>" (localized, McText), colour of the latest wave's safe ring (cyan when "?").
+//   • row: "Safe: <last 3 safe rings>" (localized, McText), colour of the latest wave's safe ring (magenta slot 4 when "?").
 //   • minimap (confident ring arena + ring centre at world (0,0) only): while the latest wave's bodies are present, its
 //     two DANGER bands in the danger style + the safe band outlined. Purge: each decided wave's step number (1/2/3)
 //     inside its safe band, kept through the explode phase; no step highlight / extra shading (no step signal yet).

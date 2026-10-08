@@ -256,10 +256,10 @@ internal sealed class MechanicMinimapPainter : IDisposable
     // GREEN / violet, danger is red, cracked amber, destroyed near-black — so "pressed" is a NEUTRAL slate tint with a
     // pale-mint check in the cell's top-right corner (clear of the centred "1F" label, which stays readable when the
     // pressed tile is also a Preset Return target: the overlay is drawn after it, light enough to keep its colour).
-    // Crystal glyph = pale-cyan diamond with a white outline (circles = players, triangles = monsters); dimmed once
-    // pressed while it is still present.
+    // Crystal glyph = pale-peach diamond with a white outline (circles = players, triangles = monsters); dimmed once
+    // pressed while it is still present. Never blue/cyan (teammates are sky-blue dots — it used to be pale cyan).
     private static readonly ColorRgba PressedC = Rgba(148, 163, 184, 1f), CheckC = Rgba(187, 247, 208, 1f),
-                                      CrystalC = Rgba(165, 243, 252, 1f), Shadow = Rgba(10, 10, 12, 1f);
+                                      CrystalC = Rgba(254, 215, 170, 1f), Shadow = Rgba(10, 10, 12, 1f);
 
     private void DrawPressedCell(float x0, float y0, float x1, float y1, string? order)
     {
