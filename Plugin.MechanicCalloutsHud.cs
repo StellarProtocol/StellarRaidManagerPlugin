@@ -14,8 +14,8 @@ namespace Stellar.RaidManager;
 // naturally (CLAUDE.md rule 5).
 //
 // TEXT SIZE ("Text size" slider, config mech_textscale, 0.75–2.0×, default 1.0×) scales everything in the list: header /
-// label / timer / names fonts, the colour swatch, row stride, column widths (label 300, timer, gaps) and the window's
-// width, min width and locked height. Two halves:
+// label / timer / names fonts, the colour swatch, row stride, column widths (timer, gaps — the label fills the rest)
+// and the window's width, min width and locked height. Two halves:
 //   • fonts: Surface = HudOverlay — the only surface that honours FontSize/DynamicFontSize (a Menu-surface TextElement
 //     ignores FontSize, WindowBuilder-Patterns.md) — with DynamicFontSize re-read every refresh, so text follows the
 //     slider LIVE. No Emphasis on these changing texts (it clobbers DynamicFontSize on HudOverlay); HudOverlay also
@@ -41,9 +41,15 @@ public sealed partial class Plugin
     // Extra space BELOW a target-name line (user: rows with names ran into the next mechanic). Only rows that have a
     // name line get it, and not the last visible line (the backdrop hugs the column, so a trailing gap would be blank).
     private const float MechHudNameGap = 6f;
-    private const float MechHudLabelW = 300f;   // mechanic-name column (was 230; long th/fil names)
-    private const float MechHudTimerW = 48f, MechHudSwatchCell = 14f, MechHudSwatch = 10f, MechHudBreak = 4f, MechHudGap = 6f;
-    private const float MechHudMinW = 550f, MechHudMaxW = 1200f;   // +70 with the label column
+    // The mechanic label FILLS the row up to the timer (its cell is the row's one Weight cell) and the timer is pinned to
+    // the inner right edge, so a wider window gives the label the room. Timer 72 (was 48): sized for the widest
+    // localized "now" ("SEKARANG" ≈ 65 px est. at 14 px) as well as "88.8s", so the label edge never shifts.
+    private const float MechHudTimerW = 72f, MechHudSwatchCell = 14f, MechHudSwatch = 10f, MechHudBreak = 4f, MechHudGap = 6f;
+    // Fixed row columns besides the label: swatch cell + gap + [label] + gap + break + gap + timer = 108.
+    private const float MechHudRowFixedW = MechHudSwatchCell + MechHudGap + MechHudGap + MechHudBreak + MechHudGap + MechHudTimerW;
+    // MinW 460 (was 550 with a fixed 300 label column): 460 − 2·20 pad − 108 = 312 label px ≥ the old 300, so nothing
+    // that fit before truncates sooner at the minimum width (the name line just wraps a little earlier).
+    private const float MechHudMinW = 460f, MechHudMaxW = 1200f;
     // Target-name line indent: swatch cell + row gap puts it under the label's first glyph, +12 (~2 spaces at 14 px) so
     // it reads as belonging to the mechanic above rather than as another label.
     private const float MechHudNameIndent = MechHudSwatchCell + MechHudGap + 12f;
@@ -79,7 +85,7 @@ public sealed partial class Plugin
             {
                 Draggable = true, EditModeDragOnly = true, Closable = false, StartVisible = false,
                 Surface = SurfaceStyle.HudOverlay,   // live DynamicFontSize (Text size)
-                // Extra width goes only to the target-name line (its one Weight cell); swatch/label/timer are fixed.
+                // Extra width goes to the mechanic label (timer stays pinned right) and the target-name line.
                 Resizable = true, MinWidth = minW, MaxWidth = MathF.Max(MechHudMaxW, minW), MinHeight = h, MaxHeight = h,
                 // Passive: the Borderless root carries a full-rect invisible raycast blocker, and with the locked tall
                 // height most of it is EMPTY — it would eat game clicks/camera drags over a big blank area mid-fight.
@@ -159,22 +165,26 @@ public sealed partial class Plugin
         {
             int i = s;
             // Bold via rich text: HudOverlay ignores Emphasis/Bold styling, and Emphasis would clobber the dynamic size.
-            var header = new TextElement(() => MechLineAt(i)?.Header is { } h ? "<b>" + h + "</b>" : "",
+            // Truncated with "…" to the inner width (HudOverlay text doesn't clip — Wrap.cs).
+            var header = new TextElement(() => MechHeader(i),
                 Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted, Shadow: true, NoWrap: true, FontSize: MechHudHeaderFont)
                 { DynamicFontSize = () => MechFont(MechHudHeaderFont) };
             var row = new RowElement(new HudElement[]
             {
                 new CellElement(new SwatchElement(() => MechRowColor(i), MechHudSwatch * sc), Width: MechHudSwatchCell * sc),
-                // Label shortened with "…" to its column (HudOverlay text doesn't clip — Plugin.MechanicCalloutsHud.Wrap.cs).
+                // Label fills everything up to the timer (Weight 1), shortened with "…" against that live width
+                // (HudOverlay text doesn't clip — Plugin.MechanicCalloutsHud.Wrap.cs).
                 new CellElement(new TextElement(() => MechLabel(i),
                     Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, NoWrap: true, FontSize: MechHudFont)
-                    { DynamicFontSize = () => MechFont(MechHudFont) }, Width: MechHudLabelW * sc),
+                    { DynamicFontSize = () => MechFont(MechHudFont) }, Weight: 1f),
                 // Fixed 4f spacer + the 6f row gap on each side = a 16f break (at a bare 6f gap neighbouring columns
                 // read as one run of text in game).
                 new SpacerElement(MechHudBreak * sc),
-                // Timer right after the fixed-width label, so its position doesn't depend on the targets.
+                // Timer: fixed-width LAST cell, right-aligned → always at the window's inner right edge, whatever the
+                // width / Text size, and the fixed width keeps the label edge from moving as digits change.
                 new CellElement(new TextElement(() => MechTimer(i),
-                    Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Shadow: true, NoWrap: true, FontSize: MechHudFont)
+                    Color: () => (ColorRgba?)_services.Theme.Colors.MenuText, Align: TextAlign.Right, Shadow: true,
+                    NoWrap: true, FontSize: MechHudFont)
                     { DynamicFontSize = () => MechFont(MechHudFont) }, Width: MechHudTimerW * sc),
             }, Gap: MechHudGap * sc);
             // Targets on their own indented line UNDER the mechanic, filling the rest of the width. HudOverlay text

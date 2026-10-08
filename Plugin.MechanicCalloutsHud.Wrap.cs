@@ -11,7 +11,8 @@ namespace Stellar.RaidManager;
 // long mechanic name into the timer. So:
 //   • names are broken BETWEEN names (",\n") against the target-name line's estimated width (window width − padding −
 //     name-line indent; re-evaluated per refresh, so a window resize or Text size change re-wraps);
-//   • an over-long mechanic label is shortened with "…" to the label column.
+//   • an over-long mechanic label is shortened with "…" to the space left of the right-pinned timer (window width −
+//     padding − fixed columns), and a group header to the full inner width.
 // Width is an ESTIMATE (no font metrics from a plugin): ≈0.58 em per Latin/Cyrillic glyph, 1 em from U+0E00 up
 // (Thai, CJK, kana — this list is localized into Thai and Japanese). It errs wide, so a line breaks a little early
 // rather than spilling. Rich-text tags (local-name accent, (safe)/(out) colour) are skipped when measuring.
@@ -34,16 +35,31 @@ public sealed partial class Plugin
         return em * px;
     }
 
-    // Target-name line width: the window's live width minus the column padding and the line's left indent (the names sit
-    // on their own line under the mechanic, so the swatch/label/timer columns no longer take from it), at the registered
-    // scale. Floored so a tiny window still wraps sensibly.
-    private float MechNamesWidth()
+    // The column's inner width: the window's live width minus the (unscaled) column padding.
+    private float MechInnerWidth()
     {
-        float sc = _mechHudBuiltScale;
         float w = 0f;
         try { w = _mechHudWindow?.Rect.Width ?? 0f; } catch { }
-        if (w <= 0f) w = MechHudMinWidth(sc);
-        return MathF.Max(60f * sc, w - 2 * MechHudPad - MechHudNameIndent * sc);
+        if (w <= 0f) w = MechHudMinWidth(_mechHudBuiltScale);
+        return w - 2 * MechHudPad;
+    }
+
+    // Target-name line width: inner width minus the line's left indent (the names sit on their own line under the
+    // mechanic, so the swatch/label/timer columns don't take from it), at the registered scale. Floored so a tiny
+    // window still wraps sensibly.
+    private float MechNamesWidth() => MathF.Max(60f * _mechHudBuiltScale, MechInnerWidth() - MechHudNameIndent * _mechHudBuiltScale);
+
+    // Mechanic label width: inner width minus the fixed swatch / gaps / break / timer columns (the label is the row's
+    // Weight cell, so it gets exactly this).
+    private float MechLabelWidth() => MathF.Max(60f * _mechHudBuiltScale, MechInnerWidth() - MechHudRowFixedW * _mechHudBuiltScale);
+
+    // Shorten to fit `max` px with a trailing "…" (no-op when it already fits).
+    private static string Ellipsize(string s, float max, float px)
+    {
+        if (EstWidth(s, px) <= max) return s;
+        string t = s;
+        while (t.Length > 1 && EstWidth(t + "…", px) > max) t = t.Substring(0, t.Length - 1);
+        return t.TrimEnd() + "…";
     }
 
     // Greedy wrap between names: "<rich local>, Alice, Bob,\nCarol". Names are joined by ", " in the tracker.
@@ -69,22 +85,33 @@ public sealed partial class Plugin
     }
 
     private readonly string?[] _mechLabelSrc = new string?[MechHudSlots], _mechLabelText = new string?[MechHudSlots];
-    private readonly float[] _mechLabelPx = new float[MechHudSlots];
+    private readonly float[] _mechLabelPx = new float[MechHudSlots], _mechLabelWidth = new float[MechHudSlots];
 
-    // The row label, shortened with "…" to the label column (cached per slot while label + font size are unchanged).
+    // The row label, shortened with "…" to the space left of the timer (cached per slot while label + font size +
+    // window width are unchanged).
     private string MechLabel(int i)
     {
         string s = MechLineAt(i)?.Row?.Label ?? "";
-        float px = MechFont(MechHudFont);
-        if (_mechLabelText[i] != null && _mechLabelSrc[i] == s && _mechLabelPx[i] == px) return _mechLabelText[i]!;
-        float max = MechHudLabelW * _mechHudBuiltScale;
-        string t = s;
-        if (EstWidth(t, px) > max)
-        {
-            while (t.Length > 1 && EstWidth(t + "…", px) > max) t = t.Substring(0, t.Length - 1);
-            t = t.TrimEnd() + "…";
-        }
-        _mechLabelSrc[i] = s; _mechLabelPx[i] = px;
-        return _mechLabelText[i] = t;
+        float px = MechFont(MechHudFont), max = MathF.Round(MechLabelWidth());
+        if (_mechLabelText[i] != null && _mechLabelSrc[i] == s && _mechLabelPx[i] == px && _mechLabelWidth[i] == max)
+            return _mechLabelText[i]!;
+        _mechLabelSrc[i] = s; _mechLabelPx[i] = px; _mechLabelWidth[i] = max;
+        return _mechLabelText[i] = Ellipsize(s, max, px);
+    }
+
+    private readonly string?[] _mechHeadSrc = new string?[MechHudSlots], _mechHeadText = new string?[MechHudSlots];
+    private readonly float[] _mechHeadPx = new float[MechHudSlots], _mechHeadWidth = new float[MechHudSlots];
+
+    // Group header as "<b>Header</b>" (bold via rich text — HudOverlay ignores Emphasis/Bold), shortened with "…" to the
+    // inner width (the min width is narrower than it was). Bold glyphs run ~5 % wider than the estimate's regular ones.
+    private string MechHeader(int i)
+    {
+        string h = MechLineAt(i)?.Header ?? "";
+        if (h.Length == 0) return "";
+        float px = MechFont(MechHudHeaderFont), max = MathF.Round(MechInnerWidth());
+        if (_mechHeadText[i] != null && _mechHeadSrc[i] == h && _mechHeadPx[i] == px && _mechHeadWidth[i] == max)
+            return _mechHeadText[i]!;
+        _mechHeadSrc[i] = h; _mechHeadPx[i] = px; _mechHeadWidth[i] = max;
+        return _mechHeadText[i] = "<b>" + Ellipsize(h, max / 1.05f, px) + "</b>";
     }
 }
