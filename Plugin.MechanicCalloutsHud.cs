@@ -15,12 +15,12 @@ namespace Stellar.RaidManager;
 //
 // TEXT SIZE ("Text size" slider, config mech_textscale, 0.75–2.0×, default 1.0×) scales everything in the list: header /
 // label / timer / names fonts, the colour swatch, row stride, column widths (timer, gaps — the label fills the rest)
-// and the window's width, min width and locked height. Two halves:
+// and the window's width, min width and min/max height. Two halves:
 //   • fonts: Surface = HudOverlay — the only surface that honours FontSize/DynamicFontSize (a Menu-surface TextElement
 //     ignores FontSize, WindowBuilder-Patterns.md) — with DynamicFontSize re-read every refresh, so text follows the
 //     slider LIVE. No Emphasis on these changing texts (it clobbers DynamicFontSize on HudOverlay); HudOverlay also
 //     ignores Bold, so the group header is bold via an inline <b> rich-text tag.
-//   • geometry: column widths, swatch size and the Resizable window's MinHeight==MaxHeight lock are baked at
+//   • geometry: column widths, swatch size and the Resizable window's Min/MaxHeight are baked at
 //     registration and can't change at runtime → the window is REMOVED and RE-REGISTERED with the same id (the
 //     framework restores its saved position) once the slider has been still for 300 ms (debounced, not per drag tick).
 public sealed partial class Plugin
@@ -28,8 +28,8 @@ public sealed partial class Plugin
     private IWindowControl? _mechHudWindow;          // null while removed (list toggle off — ApplyMechHudWindows)
     private const int MechHudSlots = 16;   // headers + rows; upstream panels rarely list more than a handful
 
-    // Width-resizable: Resizable turns OFF the Borderless content-fit on BOTH axes and fixes the height (no width-only
-    // option in WindowSpec), so the height is locked (MinHeight==MaxHeight) at a worst-case budget instead: padding +
+    // Resizable turns OFF the Borderless content-fit on BOTH axes, so the height is user-sized between MechHudMinH and a
+    // worst-case budget (= the default height; what doesn't fit collapses into a "+N" line — Overflow.cs): padding +
     // every slot at ~21f stride + a ~19f target-name line under every slot (worst case: all 16 slots are rows with
     // targets) + room for ~4 wrapped name lines (the name line spans the full width, so it wraps less than the old
     // right-hand column did) + the after-names gap under every slot. It must not be too SHORT — under-height, the root
@@ -86,7 +86,7 @@ public sealed partial class Plugin
                 Draggable = true, EditModeDragOnly = true, Closable = false, StartVisible = false,
                 Surface = SurfaceStyle.HudOverlay,   // live DynamicFontSize (Text size)
                 // Extra width goes to the mechanic label (timer stays pinned right) and the target-name line.
-                Resizable = true, MinWidth = minW, MaxWidth = MathF.Max(MechHudMaxW, minW), MinHeight = h, MaxHeight = h,
+                Resizable = true, MinWidth = minW, MaxWidth = MathF.Max(MechHudMaxW, minW), MinHeight = MechHudMinH(s), MaxHeight = h,
                 // Passive: the Borderless root carries a full-rect invisible raycast blocker, and with the locked tall
                 // height most of it is EMPTY — it would eat game clicks/camera drags over a big blank area mid-fight.
                 // Passive drops that blocker (pure info HUD, nothing clickable). Edit-mode drag/resize hit-test rects
@@ -159,7 +159,7 @@ public sealed partial class Plugin
         // content-sized (root VLG childForceExpandHeight off; a null slot collapses its whole no-Else Cond container),
         // so it covers exactly the visible rows + Padding — never the locked-tall window rect, which is what
         // WindowSpec.BackgroundOpacity would fill (a big blank box below the rows).
-        var slots = new HudElement[MechHudSlots + 1];
+        var slots = new HudElement[MechHudSlots + 2];   // backdrop + line slots + "+N"
         slots[0] = new BackdropElement(MechBackdropOpacity);
         for (int s = 0; s < MechHudSlots; s++)
         {
@@ -201,12 +201,11 @@ public sealed partial class Plugin
                     { DynamicFontSize = () => MechFont(MechHudFont) }, Weight: 1f),
             });
             // Name line + the MechHudNameGap spacer under it (Gap 0 → the spacer adds exactly its height). The spacer is
-            // skipped when this is the last visible line (nothing below to separate from) — i+1 past the slot pool
-            // counts as last too, since those lines aren't shown.
+            // skipped when nothing is shown below it (last visible line and no "+N" line — Overflow.cs).
             var namesWithGap = new ColumnElement(new HudElement[]
             {
                 names,
-                new ConditionalElement(() => i + 1 < MechHudSlots && MechLineAt(i + 1) != null,
+                new ConditionalElement(() => i + 1 < MechFit().Visible || MechFit().Hidden > 0,
                     new SpacerElement(Height: MechHudNameGap * sc)),
             }, Gap: 0f);
             var rowWithNames = new ColumnElement(new HudElement[]
@@ -215,9 +214,18 @@ public sealed partial class Plugin
                 new ConditionalElement(() => MechHasNames(i), namesWithGap),
             }, Gap: 1f * sc);
 
-            slots[s + 1] = new ConditionalElement(() => MechLineAt(i) != null,
+            // Only the lines that fit the current height (Overflow.cs) — never a half-cut row.
+            slots[s + 1] = new ConditionalElement(() => i < MechFit().Visible,
                 new ConditionalElement(() => MechLineAt(i)?.Header != null, header, Else: rowWithNames));
         }
+        // "+N" hidden-rows line in place of what didn't fit: bold green, centred across the inner width (Weight cell).
+        slots[MechHudSlots + 1] = new ConditionalElement(() => MechFit().Hidden > 0, new RowElement(new HudElement[]
+        {
+            new CellElement(new TextElement(MechOverflowText,
+                Color: () => (ColorRgba?)MechOverflowGreen, Align: TextAlign.Center, Shadow: true, NoWrap: true,
+                FontSize: MechHudFont)
+                { DynamicFontSize = () => MechFont(MechHudFont) }, Weight: 1f),
+        }));
         return new ColumnElement(slots, Gap: 3f * sc) { Padding = (int)MechHudPad };   // Passive root has 0 padding
     }
 

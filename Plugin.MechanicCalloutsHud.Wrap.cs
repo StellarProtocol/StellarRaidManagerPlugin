@@ -19,7 +19,7 @@ namespace Stellar.RaidManager;
 // Row stride vs text height: rows are laid out by the VLG from the texts' preferred heights (≈1.15–1.2 em: 14 px body
 // → ~17, 15 px header → ~18 at 1.0×), all scaled with Text size, inside a 21 px × scale stride budget;
 // each row's target-name line draws from a 19 px × scale per-slot budget and extra wrapped name lines from the 4-line
-// wrap reserve (18 px × scale each) in the locked height, so rows don't overlap.
+// wrap reserve (18 px × scale each) in the max height (smaller heights collapse into "+N" — Overflow.cs).
 public sealed partial class Plugin
 {
     private static float EstWidth(string s, float px)
