@@ -39,10 +39,10 @@ internal sealed partial class MechanicCalloutTracker
         });
     }
 
-    // Tower state (towerState): gold complete (884103) → gold 0, blue complete (884102) → 4, else activating → 7.
-    // Upstream draws 4/7 cyan/blue; our palette has no blue (teammates are blue dots) → magenta / brown.
+    // Tower state (towerState): gold complete (884103) → gold 0, blue complete (884102) → cyan, else activating → blue.
+    // Upstream cyan / blue kept: a tower is an object, not a player highlight (palette rule, MechanicCallouts.Data.cs).
     private int TombTowerColor(long tower) =>
-        HasBuff(tower, 884103) ? 0 : HasBuff(tower, 884102) ? 4 : 7;
+        HasBuff(tower, 884103) ? 0 : HasBuff(tower, 884102) ? MechanicCalloutData.CyanSlot : MechanicCalloutData.BlueSlot;
 
     // clipArenaRectToHand: the arena's WORLD rect clipped to one side of the line through (ax, az) along the facing
     // (forward = (sin f, cos f)). cross = fwd.x·(p.z − a.z) − fwd.z·(p.x − a.x); left keeps cross ≥ −ε, right ≤ ε.

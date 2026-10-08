@@ -61,20 +61,21 @@ internal sealed partial class MechanicCalloutTracker
                 _map.Regions.Add(MinimapRegion.Line(e.Pos.x, e.Pos.z, target.Pos.x, target.Pos.z, c, 3f));
         }
 
-        // Near/far chain (addChainRows): chain monsters marked near (884609) orange 5 / far (884610) magenta 4; a chain
-        // monster casting its hit in the last 4 s takes that hit's colour.
+        // Near/far chain (addChainRows): chain monsters marked near (884609) orange 5 / far (884610) cyan (upstream 4 —
+        // monsters, not a player highlight, so cyan is allowed); a chain monster casting its hit in the last 4 s
+        // takes that hit's colour.
         foreach (var b in _buffs)
         {
             if (!WlChainMonsters.Contains(Ent(b.Target)?.MonsterId ?? 0)) continue;
             if (b.BaseId == 884609) monsterColor[b.Target] = 5;
-            else if (b.BaseId == 884610) monsterColor[b.Target] = 4;
+            else if (b.BaseId == 884610) monsterColor[b.Target] = MechanicCalloutData.CyanSlot;
         }
         long now = Environment.TickCount64;
         foreach (var c in _casts)
         {
             if ((c.SkillId != 470112 && c.SkillId != 470113) || !WlChainMonsters.Contains(Ent(c.Caster)?.MonsterId ?? 0)) continue;
             long age = now - c.Tick;
-            if (age >= -500 && age <= 4000) monsterColor[c.Caster] = c.SkillId == 470112 ? 5 : 4;
+            if (age >= -500 && age <= 4000) monsterColor[c.Caster] = c.SkillId == 470112 ? 5 : MechanicCalloutData.CyanSlot;
         }
 
         AddDots(e => InSpecArena(spec, e), e =>

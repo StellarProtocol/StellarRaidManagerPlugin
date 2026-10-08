@@ -39,13 +39,16 @@ internal static class MechanicCalloutData
     }
 
     // 12-slot palette, same order as upstream colors.ts so a colorSlot index means the same colour as there — EXCEPT
-    // NO BLUE and NO WHITE: the minimap draws teammates as sky-blue dots and the local player white, so a blue/cyan or
-    // white mechanic reads as a player. Upstream 4 cyan 06B6D4 → magenta, 7 blue 3B82F6 → brown (same indices, so
-    // data rows keep working; 7 is brown not magenta because Giant pairs it with pink 6). 2 violet / 10 teal borderline.
-    // APPROVED EXCEPTION (user, 2026-10-08): Ice and Water mechanics keep upstream blue / cyan — the element hint
-    // matters more there than the teammate-dot confusion. They get their OWN slots appended after the 12 (IceSlot /
-    // WaterSlot) so every other user of 4 / 7 stays magenta / brown; never point a non-Ice/Water mechanic at them.
-    internal const int BaseSlots = 12, IceSlot = 12, WaterSlot = 13;
+    // NO BLUE and NO WHITE for mechanics that HIGHLIGHT A PLAYER (tint a player dot, ring a player, or a line/tether
+    // ending on players): the minimap draws teammates as sky-blue dots and the local player white, so a blue/cyan or
+    // white player highlight reads as "just a teammate". Upstream 4 cyan 06B6D4 → magenta, 7 blue 3B82F6 → brown (same
+    // indices, so data rows keep working; 7 is brown not magenta because Giant pairs it with pink 6). 2 violet / 10
+    // teal borderline. NARROWED (user, 2026-10-08): no blue/white only for mechanics that highlight a player; Ice/Water
+    // and non-player objects/zones (towers, portals, chain monsters, orbs, crystals, tiles, ring safe areas) may be
+    // blue/cyan/white. Those use the slots appended after the 12 BASE slots — BlueSlot (upstream 7) / CyanSlot
+    // (upstream 4); IceSlot / WaterSlot are the same slots, named for the element. Never point a player-highlighting
+    // mechanic at them.
+    internal const int BaseSlots = 12, BlueSlot = 12, CyanSlot = 13, IceSlot = BlueSlot, WaterSlot = CyanSlot;
     internal static readonly ColorRgba[] Palette =
     {
         Rgb(0xFACC15), // 0 yellow
@@ -60,16 +63,16 @@ internal static class MechanicCalloutData
         Rgb(0xA855F7), // 9 purple
         Rgb(0x14B8A6), // 10 teal
         Rgb(0xF59E0B), // 11 amber
-        Rgb(0x3B82F6), // 12 IceSlot   blue (upstream 7) — Ice exception
-        Rgb(0x06B6D4), // 13 WaterSlot cyan (upstream 4) — Water exception
+        Rgb(0x3B82F6), // 12 BlueSlot (= IceSlot)   blue (upstream 7) — Ice/Water + non-player only
+        Rgb(0x06B6D4), // 13 CyanSlot (= WaterSlot) cyan (upstream 4) — Ice/Water + non-player only
     };
 
     // 0xRRGGBB → opaque ColorRgba (explicit floats; avoids depending on FromHex's byte order).
     private static ColorRgba Rgb(uint hex) =>
         new(((hex >> 16) & 0xFF) / 255f, ((hex >> 8) & 0xFF) / 255f, (hex & 0xFF) / 255f, 1f);
 
-    // In-range slots (incl. the Ice/Water exception slots) map directly; anything else wraps over the 12 BASE slots
-    // only, so a cycling/out-of-range index can never land on the blue/cyan exception colours by accident.
+    // In-range slots (incl. the Blue/Cyan slots) map directly; anything else wraps over the 12 BASE slots
+    // only, so a cycling/out-of-range index can never land on the blue/cyan slots by accident.
     internal static ColorRgba SlotColor(int slot)
     {
         if ((uint)slot < (uint)Palette.Length) return Palette[slot];

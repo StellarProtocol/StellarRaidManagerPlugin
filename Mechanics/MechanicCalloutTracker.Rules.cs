@@ -62,7 +62,7 @@ internal sealed partial class MechanicCalloutTracker
             if (t == 0) t = e.FirstSeenTick;                                              // "first-seen"
             if (start == 0 || t > start) start = t;    // the NEWEST activation is the live one
         }
-        if (start > 0) Upsert("tomb:tower:activating", "Blue Tower", "Blue Tower Activating", 7, 100, 0, 40_000, start);
+        if (start > 0) Upsert("tomb:tower:activating", "Blue Tower", "Blue Tower Activating", MechanicCalloutData.BlueSlot, 100, 0, 40_000, start);
     }
 
     // ── Raid: pinball cast (addPinballRows, buff half) — 829314 on any entity (usually the boss), no targets ─
@@ -77,7 +77,7 @@ internal sealed partial class MechanicCalloutTracker
     // 522602 on a player, cast BY a matrix monster (4639) — the row takes the colour of that matrix's rune buff
     // (883707-883710 = A/B/C/D on the matrix itself), one row per (source matrix, colour).
     private static readonly Dictionary<int, int> ReefRuneColor = new()
-    { [883707] = 1, [883708] = 7, [883709] = 6, [883710] = 0 };
+    { [883707] = 1, [883708] = 7, [883709] = 6, [883710] = 0 };   // B stays brown 7: it tints the TARGET PLAYER (row + beam)
 
     private void ReefMatrixCalloutRows()
     {
@@ -170,7 +170,7 @@ internal sealed partial class MechanicCalloutTracker
             if (!WlChainMonsters.Contains(Ent(b.Target)?.MonsterId ?? 0)) continue;
             if (b.BaseId == 884609) near++; else far++;
         }
-        if (near + far > 0) Upsert("wl:chain:overview", "Near/Far Chain", McText.F("rm.mech.fmt.chainOverview", near, far), 4, 104, 0, 0);
+        if (near + far > 0) Upsert("wl:chain:overview", "Near/Far Chain", McText.F("rm.mech.fmt.chainOverview", near, far), MechanicCalloutData.CyanSlot, 104, 0, 0);
     }
 
     // ── Team helpers ─────────────────────────────────────────────────────────────────────────────────────────

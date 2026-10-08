@@ -73,7 +73,7 @@ internal sealed partial class MechanicCalloutTracker
             if (age < -500 || age > 4000) continue;
             bool near = c.SkillId == 470112;
             Upsert($"wl:chain:cast:{c.Caster}:{c.Tick}", "Near/Far Chain",
-                   McText.F("rm.mech.fmt.chainHit", i + 1, McText.T(near ? "Near" : "Far")), near ? 5 : 4, 104, 0, 4000, c.Tick);
+                   McText.F("rm.mech.fmt.chainHit", i + 1, McText.T(near ? "Near" : "Far")), near ? 5 : MechanicCalloutData.CyanSlot, 104, 0, 4000, c.Tick);
         }
     }
 
