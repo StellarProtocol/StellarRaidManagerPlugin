@@ -143,8 +143,7 @@ internal sealed partial class MechanicCalloutTracker
 
     // One step of the row text. Current Purge step = bold + brackets (language-neutral), NOT the minimap's yellow: an
     // inline <color> blurs on the HudOverlay list (shadow twin copies the tag — WindowBuilder-Patterns.md
-    // "shadow-twin"); inline <b> is safe.
-    // TODO: once the framework's fix/hud-shadow-color-tags ships, the current step can use the yellow accent instead.
+    // "shadow-twin"); inline <b> is safe. Framework 2.21.0 fixed that blur, but the user chose to keep the brackets.
     private static string RingStepText(int safe, bool current)
     {
         string s = safe == 0 ? "?" : McText.L(RaidRings[safe].ShortKey);
