@@ -25,14 +25,26 @@ public sealed partial class Plugin
     private static float EstWidth(string s, float px)
     {
         float em = 0f;
-        bool tag = false;
-        foreach (char c in s)
+        for (int i = 0; i < s.Length; i++)
         {
-            if (c == '<') { tag = true; continue; }
-            if (tag) { if (c == '>') tag = false; continue; }
-            em += c < 0x0E00 ? 0.58f : 1f;   // Latin/Cyrillic-ish vs Thai/CJK/kana
+            int tag = RichTagLen(s, i);
+            if (tag > 0) { i += tag - 1; continue; }
+            em += s[i] < 0x0E00 ? 0.58f : 1f;   // Latin/Cyrillic-ish vs Thai/CJK/kana
         }
         return em * px;
+    }
+
+    // Length of the uGUI rich-text tag starting at s[i] (b / i / color / size, open or close), else 0. Only these
+    // names count, so a literal "<" in a player name is still measured as text.
+    private static int RichTagLen(string s, int i)
+    {
+        if (s[i] != '<') return 0;
+        int end = s.IndexOf('>', i + 1);
+        if (end < 0) return 0;
+        var name = s.AsSpan(i + 1, end - i - 1).TrimStart('/');
+        int eq = name.IndexOf('=');
+        if (eq >= 0) name = name[..eq];
+        return name is "b" or "i" or "color" or "size" ? end - i + 1 : 0;
     }
 
     // The column's inner width: the window's live width minus the (unscaled) column padding.
@@ -53,13 +65,49 @@ public sealed partial class Plugin
     // Weight cell, so it gets exactly this).
     private float MechLabelWidth() => MathF.Max(60f * _mechHudBuiltScale, MechInnerWidth() - MechHudRowFixedW * _mechHudBuiltScale);
 
-    // Shorten to fit `max` px with a trailing "…" (no-op when it already fits).
+    // Shorten to fit `max` px with a trailing "…" (no-op when it already fits). Tag-aware (a label may carry inline <b>
+    // — Purge ring current step): a cut never lands inside a tag, a tag right before the cut is dropped, and any tag
+    // the cut leaves open is closed after the "…".
     private static string Ellipsize(string s, float max, float px)
     {
         if (EstWidth(s, px) <= max) return s;
-        string t = s;
-        while (t.Length > 1 && EstWidth(t + "…", px) > max) t = t.Substring(0, t.Length - 1);
-        return t.TrimEnd() + "…";
+        float room = max - EstWidth("…", px), w = 0f;
+        var sb = new StringBuilder();
+        var open = new Stack<string>();
+        for (int i = 0; i < s.Length; i++)
+        {
+            int tag = RichTagLen(s, i);
+            if (tag > 0)
+            {
+                string t = s.Substring(i, tag);
+                if (t[1] == '/') { if (open.Count > 0) open.Pop(); }
+                else
+                {
+                    string name = t.Substring(1, tag - 2);             // "b" / "color=#fff" → "color"
+                    int eq = name.IndexOf('=');
+                    open.Push(eq >= 0 ? name.Substring(0, eq) : name);
+                }
+                sb.Append(t);
+                i += tag - 1;
+                continue;
+            }
+            float cw = (s[i] < 0x0E00 ? 0.58f : 1f) * px;
+            if (w + cw > room && sb.Length > 0) break;
+            sb.Append(s[i]);
+            w += cw;
+        }
+        string head = sb.ToString().TrimEnd();
+        // Drop tags left dangling at the cut ("…<b>" opens nothing visible) — then close what is still open.
+        while (head.Length > 0 && head[^1] == '>')
+        {
+            int lt = head.LastIndexOf('<');
+            if (lt < 0 || RichTagLen(head, lt) != head.Length - lt || head[lt + 1] == '/') break;
+            head = head.Substring(0, lt).TrimEnd();
+            if (open.Count > 0) open.Pop();
+        }
+        var res = new StringBuilder(head).Append('…');
+        while (open.Count > 0) res.Append("</").Append(open.Pop()).Append('>');
+        return res.ToString();
     }
 
     // Greedy wrap between names: "<rich local>, Alice, Bob,\nCarol". Names are joined by ", " in the tracker.

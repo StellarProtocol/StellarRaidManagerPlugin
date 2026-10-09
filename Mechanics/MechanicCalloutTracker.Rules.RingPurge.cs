@@ -102,6 +102,11 @@ internal sealed partial class MechanicCalloutTracker
         }
     }
 
+    // Wave number N of the current Purge step (callout row highlight, RaidRingRows); 0 = none / not Purge. Matched by N,
+    // not index, so it can never mark a wave of a different sequence.
+    private int RingPurgeCurrentWave() =>
+        SceneId == 13023 && _rpCur >= 0 && _rpCur < _rpSteps.Count ? _rpSteps[_rpCur].N : 0;
+
     // No further wave can join this sequence: it is full (3 waves), or no fresh ring body for RingGapMs — past that
     // RaidRingRows treats the next body as a NEW preview (reset), so it could never become step N+1 here anyway.
     private bool RingPurgeNoMoreWaves(long now) => _rpSteps.Count >= RingPreviewWaves || now - _ringLastNewTick > RingGapMs;
