@@ -207,13 +207,35 @@ internal sealed partial class MechanicCalloutTracker
         }
     }
 
-    // Step number k inside safe ring `safe`'s band: yaw 90° − k·40° on the band's mid radius (inner ≈ 6.25, middle 15,
-    // outer ≈ 24), so repeats in the same band never overlap. style: Text region style (0 plain / 1 dim / 2 current).
+    // Step number k inside safe ring `safe`'s band; style = Text region style (0 plain / 1 dim / 2 current). The steps
+    // must NEVER overlap (user 2026-10-09 — the old 40°-apart slots stacked in the Inner band, Inner → Outer → Inner).
+    // Rule: step k ALWAYS takes slot k of its band, slots running left → right on screen, so any 2 or 3 steps sharing a
+    // band sit apart and a label never moves when a later wave decides. Sizes at the 300-px base canvas: plain/dim label
+    // 14×22 px (text scale 4 + 1 px rim), current 17.5×27.5 px (scale 5); ring view = 280 px / 110 u ≈ 2.55 px/u. Text
+    // and projection both scale with the canvas (× _k, view half-extents fixed 55), so this holds at every map size.
+    //   • Inner (disc r < 12.5): a horizontal row through the centre, z = +7.5 / 0 / −7.5 (≈ 19 px apart > 15.75 px, the
+    //     current + dim half-width sum); the outer corners stay inside r ≈ 12.2.
+    //   • Middle (12.5–17.5, mid r 15): left / top / right. The band is only ≈ 13 px wide, so the sides (label WIDTH
+    //     radial) fit it best; the top slot is used only when all three steps share the band.
+    //   • Outer (18.5–30, mid r 24.25): upper-left / bottom / upper-right (150° / 270° / 30°) — offset from the Middle
+    //     slots so a Middle label never touches an Outer one (worst case ≥ 3 px apart, all combinations checked).
+    // Screen angle θ (0 = right, 90 = up) → arena-local x = r·sinθ, z = −r·cosθ: the ring view has rotation 0
+    // (px = cx − z·s, py = cy − x·s).
+    private static readonly float[] RingMiddleDeg = { 180f, 90f, 0f }, RingOuterDeg = { 150f, 270f, 30f };
+    private const float RingInnerStepDz = 7.5f;
+
     private void AddRingStepLabel(int step, int safe, int style)
     {
-        var s = RaidRings[safe];
-        float r = (s.RIn + s.ROut) / 2f, a = (90f - step * 40f) * MathF.PI / 180f;
-        var reg = MinimapRegion.Text(MathF.Sin(a) * r, MathF.Cos(a) * r, step.ToString());
+        int k = Math.Clamp(step, 1, RingPreviewWaves);
+        float x = 0f, z = (2 - k) * RingInnerStepDz;                   // Inner: left / centre / right row
+        if (safe != RingInnerId)
+        {
+            var s = RaidRings[safe];
+            float r = (s.RIn + s.ROut) / 2f;
+            float a = (safe == RingMiddleId ? RingMiddleDeg : RingOuterDeg)[k - 1] * MathF.PI / 180f;
+            x = MathF.Sin(a) * r; z = -MathF.Cos(a) * r;
+        }
+        var reg = MinimapRegion.Text(x, z, step.ToString());
         reg.Style = style;
         _map.Regions.Add(reg);
     }

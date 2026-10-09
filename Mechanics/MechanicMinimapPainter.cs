@@ -8,7 +8,7 @@ namespace Stellar.RaidManager;
 // world +X points UP and world +Z points LEFT at rotation 0), same layer order (cached arena base → regions →
 // entities) and the same colours/alphas/sizes as its defaults (settings-store.ts minimap defaults). Departures:
 // the canvas is square (upstream sizes its canvas to the view aspect — here the view is letterboxed), and the soft
-// shadow glow on mechanic-coloured dots is a translucent halo disc.
+// shadow glow on mechanic-coloured dots is a translucent halo disc, and Text regions are painted after the entities.
 internal sealed class MechanicMinimapPainter : IDisposable
 {
     private static readonly ColorRgba Bg       = Rgba(15, 23, 42, 1f);
@@ -84,12 +84,16 @@ internal sealed class MechanicMinimapPainter : IDisposable
         if (key != _baseKey) { DrawBase(v); _r.SaveBase(); _baseKey = key; }
         else _r.RestoreBase();
 
-        foreach (var reg in v.Regions) DrawRegion(reg);
+        foreach (var reg in v.Regions) if (reg.Kind != MinimapRegionKind.Text) DrawRegion(reg);
         // Monsters under the team, local player last (on top).
         foreach (var d in v.Dots) if (d.Kind == MinimapDotKind.Monster)  DrawDot(d);
         foreach (var d in v.Dots)
             if (d.Kind == MinimapDotKind.Teammate && !(HideNormalTeammates && d.Slot < 0)) DrawDot(d);
         foreach (var d in v.Dots) if (d.Kind == MinimapDotKind.Local)    DrawDot(d);
+        // Text regions (raid ring step numbers) AFTER the dots: the party stands in the safe band right where the
+        // numbers sit, and a number hidden under a dot is useless (user 2026-10-09). Their dark rim keeps them readable
+        // over a dot. Party markers stay last (player-placed). Other regions keep their place under the dots.
+        foreach (var reg in v.Regions) if (reg.Kind == MinimapRegionKind.Text) DrawRegion(reg);
         if (ShowMarkers) foreach (var m in v.Markers) DrawMarker(m.Slot, m.X, m.Z);
         _r.Upload();
     }
