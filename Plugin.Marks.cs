@@ -98,13 +98,13 @@ public sealed partial class Plugin
         // Step navigation from the keyboard — usable mid-fight without opening the window. Each op guards on
         // "no active preset" itself (see PrevStep/ResetSteps/NextStep), so a stray press just shows an error tip.
         _prevHotkey = _services.Hotkeys.DeclareAction(
-            new HotkeyAction("raidmanager.marks.prev", "Mark Presets: Previous step",
+            new HotkeyAction("raidmanager.marks.prev", _loc.T("rm.marks.hotkey.prev"),
                 null), PrevStep);
         _resetHotkey = _services.Hotkeys.DeclareAction(
-            new HotkeyAction("raidmanager.marks.reset", "Mark Presets: Reset to Start",
+            new HotkeyAction("raidmanager.marks.reset", _loc.T("rm.marks.hotkey.reset"),
                 null), ResetSteps);
         _nextHotkey = _services.Hotkeys.DeclareAction(
-            new HotkeyAction("raidmanager.marks.next", "Mark Presets: Next step",
+            new HotkeyAction("raidmanager.marks.next", _loc.T("rm.marks.hotkey.next"),
                 null), NextStep);
 
         _services.Log.Info($"[MarkPresets] initialized ({_presets.Count} preset(s) loaded, active={_activeIndex})");
