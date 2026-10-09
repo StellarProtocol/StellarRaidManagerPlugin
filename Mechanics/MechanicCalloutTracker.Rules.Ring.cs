@@ -27,8 +27,9 @@ namespace Stellar.RaidManager;
 //     Reset (live): no fresh body for 10 s, or none present and none fresh for 3 s.
 //   • row: "Safe: <last 3 safe rings>" (localized, McText), colour of the latest wave's safe ring (cyan when "?" — a zone, not a player highlight).
 //   • minimap (confident ring arena + ring centre at world (0,0) only): while the latest wave's bodies are present, its
-//     two DANGER bands in the danger style + the safe band outlined. Purge: each decided wave's step number (1/2/3)
-//     inside its safe band, kept through the explode phase; no step highlight / extra shading (no step signal yet).
+//     two DANGER bands in the danger style + the safe band outlined. Purge (13023): the CURRENT step's bands instead,
+//     and each decided wave's step number (1/2/3) inside its safe band with the current step highlighted
+//     (MechanicCalloutTracker.Rules.RingPurge.cs — each wave explodes 10 s after its own spawn, user-confirmed).
 // Experiment's copy (diagnostics lab) logs every wave / decision / ring-id cast; this shipped copy has no diagnostics.
 internal sealed partial class MechanicCalloutTracker
 {
@@ -125,7 +126,7 @@ internal sealed partial class MechanicCalloutTracker
         if (_ringWaves.Count > 6) _ringWaves.RemoveRange(0, _ringWaves.Count - 6);   // live mode: history only
         if (_ringNew.Count > 0) _ringLastNewTick = now;
         foreach (var w in _ringWaves) if (!w.Decided) RingDecide(w, now);
-        RingDangerCheck(now);                                          // Clash/Brutal MOVE warning (RingDanger.cs)
+        RingDangerCheck(now);                                          // MOVE warning: Clash/Brutal + Purge steps (RingDanger.cs)
 
         if (_ringWaves.Count == 0) return;
         var shown = _ringWaves.Skip(Math.Max(0, _ringWaves.Count - 3)).ToList();
@@ -169,14 +170,16 @@ internal sealed partial class MechanicCalloutTracker
     // 1:1 (DungeonsTable SceneID; RaidDungeonTable Difficult 1/2/3). Unknown → preview rules (the safe superset).
     private bool RingPreviewMode() => SceneId is not (13021 or 13022);
 
-    // Minimap (BuildRaidMap, confident ring arena): latest wave's danger bands while its bodies are present + Purge step numbers.
+    // Minimap (BuildRaidMap, confident ring arena): latest wave's danger bands while its bodies are present (Purge:
+    // the current step's) + step numbers. A running Purge step survives a sequence reset (copied steps).
     private void AddRingBand()
     {
-        if (_ringWaves.Count == 0 || !_ringCentreOk) return;   // no ring body near world (0,0) — centre unknown
+        if ((_ringWaves.Count == 0 && _rpCur < 0) || !_ringCentreOk) return;   // no ring body near world (0,0) — centre unknown
+        if (SceneId == 13023) { AddPurgeRingMap(); return; }        // Purge: current STEP's bands + highlight (RingPurge.cs)
         var w = _ringWaves[^1];
-        // Latest wave's bodies present = live danger (Clash/Brutal) or the wave being previewed (Purge): shade its two
-        // danger bands + outline the safe band. Bodies gone: live = wave over; Purge = explode phase, and with no
-        // confirmed explode-step signal yet nothing extra is shaded (don't guess the timing).
+        // Latest wave's bodies present = live danger (Clash/Brutal) or the wave being previewed (unknown scene): shade
+        // its two danger bands + outline the safe band. Bodies gone: live = wave over; unknown scene = nothing extra
+        // (no explode timing known there — don't guess).
         if (w.Uuids.Any(u => _ents.TryGetValue(u, out var e) && RaidRings.ContainsKey(e.MonsterId)))
         {
             foreach (int id in w.Ids.Distinct())
@@ -195,17 +198,24 @@ internal sealed partial class MechanicCalloutTracker
             }
         }
         if (!RingPreviewMode()) return;
-        // Purge: each decided wave's STEP NUMBER (1/2/3) inside its SAFE band, kept through the explode phase until the
-        // sequence resets. Step k sits at yaw 90° − k·40° on the band's mid radius (inner ≈ 6.25, middle 15, outer
-        // ≈ 24), so repeats in the same band never overlap. All equal brightness: no confirmed step signal yet.
+        // Unknown scene (preview rules): each decided wave's STEP NUMBER (1/2/3) inside its SAFE band, kept through the
+        // explode phase until the sequence resets. All equal brightness (the step timing is only known for Purge).
         for (int i = 0; i < _ringWaves.Count; i++)
         {
             var wi = _ringWaves[i];
-            if (!wi.Decided || wi.Safe == 0) continue;
-            var s = RaidRings[wi.Safe];
-            float r = (s.RIn + s.ROut) / 2f, a = (90f - (i + 1) * 40f) * MathF.PI / 180f;
-            _map.Regions.Add(MinimapRegion.Text(MathF.Sin(a) * r, MathF.Cos(a) * r, (i + 1).ToString()));
+            if (wi.Decided && wi.Safe != 0) AddRingStepLabel(i + 1, wi.Safe, 0);
         }
+    }
+
+    // Step number k inside safe ring `safe`'s band: yaw 90° − k·40° on the band's mid radius (inner ≈ 6.25, middle 15,
+    // outer ≈ 24), so repeats in the same band never overlap. style: Text region style (0 plain / 1 dim / 2 current).
+    private void AddRingStepLabel(int step, int safe, int style)
+    {
+        var s = RaidRings[safe];
+        float r = (s.RIn + s.ROut) / 2f, a = (90f - step * 40f) * MathF.PI / 180f;
+        var reg = MinimapRegion.Text(MathF.Sin(a) * r, MathF.Cos(a) * r, step.ToString());
+        reg.Style = style;
+        _map.Regions.Add(reg);
     }
 
     private void ResetRing()

@@ -221,6 +221,7 @@
   "rm.mech.ring.name": "電磁リング",
   "rm.mech.ring.outer": "外周",
   "rm.mech.ring.safe": "安全：{0}",
+  "rm.mech.ring.step": "電磁リング・ステップ {0}/{1}",
   "rm.mech.safe": "（安全）",
   "rm.mech.test.you": "あなた",
   "rm.mech.title": "ギミック通知 (ベータ)",

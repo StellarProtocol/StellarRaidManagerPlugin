@@ -158,9 +158,12 @@ internal sealed class MechanicMinimapPainter : IDisposable
         if (reg.Kind == MinimapRegionKind.Crystal) { DrawCrystal(reg); return; }
         if (reg.Kind == MinimapRegionKind.Text)
         {
-            // Arena-local label (raid ring step numbers): white, dark-outlined, same size as the tile labels.
+            // Arena-local label (raid ring step numbers): white, dark-outlined, same size as the tile labels. Purge step
+            // highlight: the CURRENT step is palette yellow and one size up, the other steps slate (dimmed).
             var (lx, ly) = L(reg.X, reg.Z);
-            if (!string.IsNullOrEmpty(reg.Label)) _r.Text(reg.Label!, lx, ly, K(4f), White, outline: true);
+            if (!string.IsNullOrEmpty(reg.Label))
+                _r.Text(reg.Label!, lx, ly, K(reg.Style == 2 ? 5f : 4f),
+                        reg.Style == 2 ? MechanicCalloutData.SlotColor(0) : reg.Style == 1 ? PressedC : White, outline: true);
             return;
         }
         var (ax, ay) = P(reg.X - reg.HalfX, reg.Z - reg.HalfZ);

@@ -49,6 +49,7 @@ internal struct MinimapRegion
                                        //       3 = DANGER no-go tile (red fill + hazard stripes + heavy outline; Phase Mapping / Explosions)
                                        //       4 = Preset Return crystal PRESSED on this tile (grey tint + check mark, label-safe)
                                        // Crystal: 1 = pressed but still present (dimmed glyph)
+                                       // Text:    0 = plain white, 1 = dimmed (not the current Purge step), 2 = CURRENT Purge step (bright, larger)
                                        // Ring:    3 = raid ring DANGER band (red fill + heavy edges), 1 = SAFE band (calm outline only)
 
     public static MinimapRegion Ring(float rInner, float rOuter, int color) =>

@@ -221,6 +221,7 @@
   "rm.mech.ring.name": "Elektromagnetikong Singsing",
   "rm.mech.ring.outer": "Labas",
   "rm.mech.ring.safe": "Ligtas: {0}",
+  "rm.mech.ring.step": "Elektromagnetikong Singsing · Hakbang {0}/{1}",
   "rm.mech.safe": "(ligtas)",
   "rm.mech.test.you": "Ikaw",
   "rm.mech.title": "Mga Tawag ng Mekaniko (Beta)",

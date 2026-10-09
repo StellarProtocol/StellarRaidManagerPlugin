@@ -221,6 +221,7 @@
   "rm.mech.ring.name": "Electromagnetic Ring",
   "rm.mech.ring.outer": "Outer",
   "rm.mech.ring.safe": "Safe: {0}",
+  "rm.mech.ring.step": "Electromagnetic Ring · Step {0}/{1}",
   "rm.mech.safe": "(safe)",
   "rm.mech.test.you": "You",
   "rm.mech.title": "Mechanic Callouts (Beta)",
