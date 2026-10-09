@@ -15,7 +15,9 @@ namespace Stellar.RaidManager;
 //   • Current step = the EARLIEST step whose explode tick (StartTick + 10 s) is still in the future. With a known safe
 //     ring it is armed as the danger window (RingDanger.cs: same band test / radii / LocalRing* / banner as Clash/Brutal,
 //     plus LocalRingStep). Step 1 is current from its own spawn — i.e. already during the rest of the preview.
-//   • After the last step explodes there is no current step: no window, no minimap bands/highlight.
+//   • After the last step explodes there is no current step: no window, no minimap bands/highlight. Once no further
+//     wave can join (3 steps, or RingGapMs without a fresh body) the sequence ENDS: row + step numbers cleared
+//     (RingPurgeEnd). Fewer than 3 waves / "?" steps: ends after the last KNOWN step, once that gap has passed.
 //   • Minimap (AddRingBand → AddPurgeRingMap): the CURRENT step's two danger bands + safe outline (not the latest
 //     preview wave), and its step number highlighted among the 1/2/3 labels (others dimmed).
 // Experiment's copy logs each step / enter / leave / explode; this shipped copy has no diagnostics.
@@ -42,6 +44,7 @@ internal sealed partial class MechanicCalloutTracker
         // The armed step's explosion first, so the next step can arm in this same scan.
         if (_rdWave != 0 && now - _rdStart >= _rdDelay) RingDangerEnd();
         _rpCur = _rpSteps.FindIndex(s => now - s.StartTick < RingPurgeExplodeMs);
+        if (_rpCur < 0 && _rpSteps.Count > 0 && RingPurgeNoMoreWaves(now)) RingPurgeEnd();
 
         if (!arena) { if (_rdWave != 0) RingDangerEnd(); return; }
         if (_rpCur >= 0 && _rpSteps[_rpCur] is { Decided: true, Safe: not 0 } step)
@@ -97,6 +100,19 @@ internal sealed partial class MechanicCalloutTracker
             if (!s.Decided || s.Safe == 0) continue;
             AddRingStepLabel(i + 1, s.Safe, _rpCur < 0 ? 0 : i == _rpCur ? 2 : 1);
         }
+    }
+
+    // No further wave can join this sequence: it is full (3 waves), or no fresh ring body for RingGapMs — past that
+    // RaidRingRows treats the next body as a NEW preview (reset), so it could never become step N+1 here anyway.
+    private bool RingPurgeNoMoreWaves(long now) => _rpSteps.Count >= RingPreviewWaves || now - _ringLastNewTick > RingGapMs;
+
+    // The sequence ENDS when its last step has exploded and no further wave can join (user 2026-10-09): clear the row
+    // (RaidRingRows stops upserting once _ringWaves is empty), the step numbers and the bands. The 40 s hold /
+    // new-preview resets stay as fallbacks.
+    private void RingPurgeEnd()
+    {
+        _ringWaves.Clear();
+        _rpSteps.Clear(); _rpCur = -1;
     }
 
     private void ClearRingPurge()
