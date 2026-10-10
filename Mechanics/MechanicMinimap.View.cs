@@ -88,6 +88,7 @@ internal struct MinimapDot
     public float Facing;               // yaw degrees (upstream convention), valid when HasFacing — local player arrow
     public bool  HasFacing;
     public bool  Dead;                 // team member dead → dimmed × (overrides mechanic colour)
+    public bool  Ball;                 // raid pinball ball (Monster kind) → drawn as a large circle, not a triangle
 }
 
 // ── S3 raid "Forgotten Dreamwild" arena (port of scenes/s3-raid/arena.ts) ────────────────────────────────────
