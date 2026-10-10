@@ -20,6 +20,17 @@ public sealed partial class Plugin
             }, Gap: 8f),
             new SeparatorElement(),
 
+            // ── Mechanic Callouts (list + minimap + on-me alerts; Plugin.MechanicCallouts.cs) ──
+            new TextElement(() => _loc.T("rm.mech.title"), Emphasis: true),
+            new TextElement(
+                () => _loc.T("rm.mech.intro"),
+                Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
+            new RowElement(new HudElement[]
+            {
+                new ButtonElement(() => _loc.T("rm.mech.open"), OnClick: () => _mechWindow.SetVisible(true)),
+            }, Gap: 8f),
+            new SeparatorElement(),
+
             new TextElement(() => _loc.T("rm.countdown"), Emphasis: true),
             new RowElement(new HudElement[]
             {
