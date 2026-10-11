@@ -340,7 +340,8 @@ internal sealed class MechanicMinimapPainter : IDisposable
     }
 
     // Team = circle (local white with a white ring, teammates sky-blue), mechanic colour overrides + halo;
-    // everything else = upward triangle (boss red unless mechanic-coloured).
+    // everything else = upward triangle (boss red unless mechanic-coloured) — except the raid pinball ball, a large
+    // outlined disc so it reads as a ball, not just another monster.
     private void DrawDot(in MinimapDot d)
     {
         if (d.Hidden) return;
@@ -352,6 +353,14 @@ internal sealed class MechanicMinimapPainter : IDisposable
         if (d.Kind == MinimapDotKind.Monster)
         {
             float r = MonsterR;
+            if (d.Ball)
+            {
+                float br = r * 1.6f;
+                _r.FillCircle(x, y, br + K(4f), c, 0.35f);                         // halo, like the player dots
+                _r.FillCircle(x, y, br, c, 1f);
+                _r.StrokeCircle(x, y, br, K(1.5f), Rgba(15, 15, 20, 1f), 0.95f);   // dark rim — reads on any tile
+                return;
+            }
             if (mech) _r.FillCircle(x, y, r + K(3f), c, 0.3f);
             _r.FillTriangle(x, y - r, x + r * 0.866f, y + r * 0.5f, x - r * 0.866f, y + r * 0.5f, c, 1f);
             return;

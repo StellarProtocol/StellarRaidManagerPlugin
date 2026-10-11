@@ -145,7 +145,8 @@ internal sealed partial class MechanicCalloutTracker
                 if (ms >= 0) slot = ms;
                 if (slot < 0 && !_scene!.Bosses.Contains(e.MonsterId)) continue;
                 _mapDotGo.Add(e.GoComp);
-                _map.Dots.Add(new MinimapDot { X = e.Pos.x, Z = e.Pos.z, Slot = slot, Kind = MinimapDotKind.Monster });
+                _map.Dots.Add(new MinimapDot { X = e.Pos.x, Z = e.Pos.z, Slot = slot, Kind = MinimapDotKind.Monster,
+                                           Ball = e.MonsterId == PinballBallId });
             }
         }
     }
