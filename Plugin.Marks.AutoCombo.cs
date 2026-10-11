@@ -94,9 +94,11 @@ public sealed partial class Plugin
     }
 
     // ── Auto Combo switch suspend / restore (Lua only — local attrs have no working C# path, see KB) ────────────────
-    // Returns the switch value BEFORE the suspend as a string ("true"/"false"/"nil"/"ERR"); when "true" the switch has
-    // been set false and the caller MUST call MkRestoreAutoCombo in a finally. String global = no Lua-type-strict
-    // readback pitfalls (Framework-Interop-Foundation.md §2).
+    // Returns the switch value BEFORE the suspend as a string ("true"/"false"/"nil"/"ERR") — FOR LOGGING ONLY. The
+    // restore decision never depends on this C# readback: the Lua chunk itself parks _rm_mkab_was=true exactly when it
+    // flipped the switch off, and MkRestoreAutoCombo (run UNCONDITIONALLY in the caller's finally) keys on that Lua
+    // global. So even if ReadGlobalString throws after the flip, Auto Combo still comes back on. String global for the
+    // log value = no Lua-type-strict readback pitfalls (Framework-Interop-Foundation.md §2).
     private string MkSuspendAutoCombo()
     {
         try
@@ -104,6 +106,7 @@ public sealed partial class Plugin
             if (!_services.Lua.Ready) return "ERR";
             const string chunk = @"
 rawset(_G,'_rm_mkab','ERR')
+rawset(_G,'_rm_mkab_was',nil)
 pcall(function()
   if Z.EntityMgr==nil or Z.LocalAttr==nil then return end
   local pe=(Z.EntityMgr).PlayerEnt
@@ -112,7 +115,10 @@ pcall(function()
   local v=nil
   if a then v=a.Value end
   rawset(_G,'_rm_mkab', tostring(v))
-  if v==true then pe:SetLuaAttr(Z.LocalAttr.EAutoBattleSwitch, false) end
+  if v==true then
+    pe:SetLuaAttr(Z.LocalAttr.EAutoBattleSwitch, false)
+    rawset(_G,'_rm_mkab_was',true)
+  end
 end)";
             _services.Lua.DoString(chunk);
             return _services.Lua.ReadGlobalString("_rm_mkab") ?? "ERR";
@@ -120,13 +126,16 @@ end)";
         catch (Exception ex) { _services.Log.Warning($"[MarkPresets] auto-combo suspend threw: {ex.Message}"); return "ERR"; }
     }
 
+    // Safe to call unconditionally: a no-op unless the suspend chunk parked _rm_mkab_was. The flag is cleared even if
+    // the SetLuaAttr inside fails (outer pcall + trailing rawset) so a stale flag can't re-enable Auto Combo later.
     private void MkRestoreAutoCombo()
     {
         try
         {
             _services.Lua.DoString(
-                "pcall(function() local pe=(Z.EntityMgr).PlayerEnt if pe then " +
-                "pe:SetLuaAttr(Z.LocalAttr.EAutoBattleSwitch, true) end end)");
+                "pcall(function() if rawget(_G,'_rm_mkab_was') then local pe=(Z.EntityMgr).PlayerEnt if pe then " +
+                "pe:SetLuaAttr(Z.LocalAttr.EAutoBattleSwitch, true) end end end) " +
+                "rawset(_G,'_rm_mkab_was',nil)");
         }
         catch (Exception ex) { _services.Log.Warning($"[MarkPresets] auto-combo RESTORE threw: {ex.Message}"); }
     }

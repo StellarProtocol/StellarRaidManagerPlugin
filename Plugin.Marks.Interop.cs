@@ -90,10 +90,10 @@ public sealed partial class Plugin
             // Begin → write → Fire sequence and ALWAYS restore it in the finally, even if a call below throws.
             MkResolveExt();
             object? pe = MkPlayerEntity();
-            string abBefore = MkSuspendAutoCombo();
-            string isAuto = MkIsAutoBattleStr(pe);   // ECS state AFTER the switch suspend (does it follow same-frame?)
+            string abBefore = MkSuspendAutoCombo();   // log value only — restore keys on a Lua-side flag
             try
             {
+                string isAuto = MkIsAutoBattleStr(pe);   // ECS state AFTER the switch suspend (does it follow same-frame?)
                 string entPosBefore = MkEntityIndicatorPosStr(pe);
                 // BeginIndicator seeds the reticle; overwrite AFTER so our chosen point wins the same-frame race.
                 object? began = _mkBeginIndicator!.Invoke(mgr, new object[] { MkSlotId(slot), MkSkillId(slot) });
@@ -114,7 +114,7 @@ public sealed partial class Plugin
             }
             finally
             {
-                if (abBefore == "true") MkRestoreAutoCombo();
+                MkRestoreAutoCombo();   // unconditional; no-op unless the suspend chunk parked _rm_mkab_was
             }
             return true;
         }
