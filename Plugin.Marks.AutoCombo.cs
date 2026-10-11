@@ -8,31 +8,37 @@ using UnityEngine;
 
 namespace Stellar.RaidManager;
 
-// ── Punctuate Mark Presets — Auto Combo workaround + placement diagnostics ─────────────────────────────────────────
+// ── Punctuate Mark Presets — Auto Combo (auto-battle) fire path + placement diagnostics ────────────────────────────
 //
-// BUG: with the game's Auto Combo (= AutoBattle) switched ON, every preset mark lands at the player's feet instead of
-// its stored position. The game's own help text says "Free Casting Mode does not apply when Auto Combo is enabled",
-// so the inferred cause is that FireSkill's point-target path ignores ZIndicatorMgr.indicatorPos_ while auto-battle
-// is on and falls back to self. Method bodies aren't in the dump, so this is a FIX ATTEMPT + diagnostics:
+// BUG: with the game's Auto Combo (= AutoBattle) ON, ZIndicatorMgr.FireSkill() places NO mark. Static RE of
+// GameAssembly found the gate in ZSkillInputMgr.FirePlaySkillEvent(SkillControlData, clearSlot, isIndicator,
+// isAIPress): `if (AutoBattleComponent.Value(PlayerEnt) && !isAIPress) { AICachePressSlot = slot; return true; }`.
+// FireSkill passes isAIPress=false, so under auto-battle the press is parked for the AI and swallowed. Toggling the
+// local attr EAutoBattleSwitch does NOT clear AutoBattleComponent (validated in-game) — that attempt is removed.
 //
-//   1. Suspend the live Auto Combo switch (local attr EAutoBattleSwitch = 49) around the Begin → write → Fire
-//      sequence, restoring it in a finally. Lua is the ONLY read/write path for local attrs (the game does exactly
-//      this in fighterbtns_view.lua:1957-1960). We do NOT call SetIsAutoBattle / StopPlayerAIBattle or touch
-//      setting 1012 — those have side effects beyond a one-frame suspend.
-//   2. Also write the ENTITY-level indicator position (EntityAttrExtensions.SetIndicatorPos → IndicatorPosComponent
-//      on the player ZEntity) — a second target-point store that the cast path may read instead of the mgr field.
-//   3. One diagnostic log line per placed mark (never per frame) + one post-placement verification block comparing
-//      intended vs actual mark positions read back from the effect registry (MkReadOwnMarks).
+// FIX: replicate FireSkill ourselves with isAIPress=true (it has no other effect, so this works with Auto Combo on
+// OR off):  SetIndicatorPos/Rot on the player entity (what the cast actually reads: GetPassiveSelectPoint →
+// GetIndicatorPos) → SkillControlDataMgr.TryGetSkillControlData(skillId) → PlayerEnt.SkillInputComp.SkillInputMgr
+// .FirePlaySkillEvent(data, true, true, true) → ZIndicatorMgr.TryCancelIndicator(false, !ok) (FireSkill's own
+// `end(false, !ok)`). Any piece unresolved → fall back to FireSkill() (works with Auto Combo off) and log once why.
+// Plain calls only — NO Harmony patch (in-struct trampoline crash risk, see KB).
 public sealed partial class Plugin
 {
     private const float MkVerifyDelay = 0.5f;   // seconds after the queue drains — lets the mark effects spawn
 
-    // Lazily-resolved reflection for the entity-level indicator store + diagnostics. Each piece is optional: a miss
-    // just skips that write/log field, it never blocks placement.
+    // Lazily-resolved reflection, resolved ONCE. Each piece is optional: a miss skips that write/log field or drops
+    // to the FireSkill fallback, it never blocks placement.
     private bool _mkExtResolved;
-    private MethodInfo? _mkSetIndicatorPos, _mkGetIndicatorPos, _mkGetIsAutoBattle, _mkCheckIndicatorEnable;
-    private PropertyInfo? _mkIsEnable, _mkEntMgrInstance;
+    private MethodInfo? _mkSetIndicatorPos, _mkSetIndicatorRot, _mkGetIndicatorPos, _mkGetIsAutoBattle;
+    private PropertyInfo? _mkEntMgrInstance, _mkPlayerEntProp;
     private MethodInfo? _mkGetEntity;
+    // aipress path: PlayerEnt.SkillInputComp → PlayerSkillInputComp.SkillInputMgr (internal ZSkillInputMgr; interop
+    // surfaces it as a property) → FirePlaySkillEvent; SkillControlDataMgr (ZSingleton) → TryGetSkillControlData.
+    private Type? _mkPlayerEntType, _mkScdMgrType;
+    private PropertyInfo? _mkSkillInputComp, _mkSkillInputMgr;
+    private MethodInfo? _mkTryGetScd, _mkFirePlaySkillEvent, _mkTryCancelIndicator;
+    private string? _mkAiPressMissing;   // null = aipress path fully resolved; else why not (logged once)
+    private bool _mkFallbackLogged;
 
     // Post-placement verification: what each slot was SENT to in the current apply, and a countdown armed when the
     // load queue drains. Cleared on every ApplyStep so a verify never mixes two applies.
@@ -46,106 +52,124 @@ public sealed partial class Plugin
         try
         {
             const BindingFlags S = BindingFlags.Public | BindingFlags.Static;
+            const BindingFlags I = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
             var ext = StellarInterop.FindType("Panda.ZGame.EntityAttrExtensions");
             if (ext != null)
                 foreach (var m in ext.GetMethods(S))
                 {
                     int n = m.GetParameters().Length;
                     if      (m.Name == "SetIndicatorPos" && n == 2) _mkSetIndicatorPos = m;
+                    else if (m.Name == "SetIndicatorRot" && n == 2) _mkSetIndicatorRot = m;
                     else if (m.Name == "GetIndicatorPos" && n == 1) _mkGetIndicatorPos = m;
                     else if (m.Name == "GetIsAutoBattle" && n == 1) _mkGetIsAutoBattle = m;
                 }
 
-            if (_mkIndicatorType != null)
-            {
-                _mkIsEnable = _mkIndicatorType.GetProperty("IsEnable", BindingFlags.Public | BindingFlags.Instance);
-                _mkCheckIndicatorEnable = _mkIndicatorType.GetMethod("CheckIndicatorEnable", new[] { typeof(int), typeof(bool) });
-            }
-
             // ZEntityMgr.Instance is inherited from ZSingleton<T> → FlattenHierarchy (same as MechanicCalloutTracker).
+            // PlayerEnt is the TYPED local player — GetEntity(long) returns a ZEntity-typed wrapper on which the
+            // PlayerEnt-only SkillInputComp property can't be read, so it's just the fallback.
             var entMgr = StellarInterop.FindType("Panda.ZGame.ZEntityMgr");
             if (entMgr != null)
             {
                 _mkEntMgrInstance = entMgr.GetProperty("Instance", S | BindingFlags.FlattenHierarchy);
+                _mkPlayerEntProp  = entMgr.GetProperty("PlayerEnt", BindingFlags.Public | BindingFlags.Instance);
                 foreach (var m in entMgr.GetMethods(BindingFlags.Public | BindingFlags.Instance))
                     if (m.Name == "GetEntity" && m.GetParameters() is { Length: 1 } ps && ps[0].ParameterType == typeof(long))
                     { _mkGetEntity = m; break; }
             }
 
+            _mkPlayerEntType = StellarInterop.FindType("Panda.ZGame.PlayerEnt");
+            _mkSkillInputComp = _mkPlayerEntType?.GetProperty("SkillInputComp", I);
+            _mkSkillInputMgr  = StellarInterop.FindType("Panda.ZGame.PlayerSkillInputComp")?.GetProperty("SkillInputMgr", I);
+            var sim = StellarInterop.FindType("Panda.ZGame.ZSkillInputMgr");
+            if (sim != null) _mkFirePlaySkillEvent = StellarInterop.FindMethod(sim, "FirePlaySkillEvent", 4);   // unique
+            _mkScdMgrType = StellarInterop.FindType("Panda.ZGame.SkillControlDataMgr");
+            // Instance overload only (ZSkillInputMgr has an unrelated STATIC 3-arg one — different type, no clash).
+            if (_mkScdMgrType != null) _mkTryGetScd = StellarInterop.FindMethod(_mkScdMgrType, "TryGetSkillControlData", 2);
+            if (_mkIndicatorType != null) _mkTryCancelIndicator = StellarInterop.FindMethod(_mkIndicatorType, "TryCancelIndicator", 2);
+
+            var missing = new List<string>();
+            if (_mkPlayerEntProp == null)      missing.Add("ZEntityMgr.PlayerEnt");
+            if (_mkSkillInputComp == null)     missing.Add("PlayerEnt.SkillInputComp");
+            if (_mkSkillInputMgr == null)      missing.Add("PlayerSkillInputComp.SkillInputMgr");
+            if (_mkFirePlaySkillEvent == null) missing.Add("ZSkillInputMgr.FirePlaySkillEvent");
+            if (_mkTryGetScd == null)          missing.Add("SkillControlDataMgr.TryGetSkillControlData");
+            if (_mkTryCancelIndicator == null) missing.Add("ZIndicatorMgr.TryCancelIndicator");
+            _mkAiPressMissing = missing.Count == 0 ? null : string.Join(",", missing);
+
             _services.Log.Info(
-                $"[MarkPresets] ext resolve: SetIndicatorPos={_mkSetIndicatorPos != null} GetIndicatorPos={_mkGetIndicatorPos != null} " +
-                $"GetIsAutoBattle={_mkGetIsAutoBattle != null} IsEnable={_mkIsEnable != null} " +
-                $"CheckIndicatorEnable={_mkCheckIndicatorEnable != null} GetEntity={_mkGetEntity != null}");
+                $"[MarkPresets] ext resolve: SetIndicatorPos={_mkSetIndicatorPos != null} SetIndicatorRot={_mkSetIndicatorRot != null} " +
+                $"GetIndicatorPos={_mkGetIndicatorPos != null} GetIsAutoBattle={_mkGetIsAutoBattle != null} " +
+                $"GetEntity={_mkGetEntity != null} aipress={(_mkAiPressMissing == null ? "ok" : "MISSING " + _mkAiPressMissing)}");
         }
-        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] ext resolve threw: {ex.Message}"); }
+        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] ext resolve threw: {ex.Message}"); _mkAiPressMissing ??= "resolve threw"; }
     }
 
     private object? MkPlayerEntity()
     {
         try
         {
-            if (_mkEntMgrInstance == null || _mkGetEntity == null) return null;
+            var mgr = _mkEntMgrInstance?.GetValue(null);
+            if (mgr == null) return null;
+            if (_mkPlayerEntProp?.GetValue(mgr) is { } pe) return pe;
+            if (_mkGetEntity == null) return null;
             long uuid = _services.CombatSnapshot.LocalEntityId.Value;
-            if (uuid == 0) return null;
-            var mgr = _mkEntMgrInstance.GetValue(null);
-            return mgr == null ? null : _mkGetEntity.Invoke(mgr, new object[] { uuid });
+            return uuid == 0 ? null : _mkGetEntity.Invoke(mgr, new object[] { uuid });
         }
         catch { return null; }
     }
 
-    // ── Auto Combo switch suspend / restore (Lua only — local attrs have no working C# path, see KB) ────────────────
-    // Returns the switch value BEFORE the suspend as a string ("true"/"false"/"nil"/"ERR") — FOR LOGGING ONLY. The
-    // restore decision never depends on this C# readback: the Lua chunk itself parks _rm_mkab_was=true exactly when it
-    // flipped the switch off, and MkRestoreAutoCombo (run UNCONDITIONALLY in the caller's finally) keys on that Lua
-    // global. So even if ReadGlobalString throws after the flip, Auto Combo still comes back on. String global for the
-    // log value = no Lua-type-strict readback pitfalls (Framework-Interop-Foundation.md §2).
-    private string MkSuspendAutoCombo()
+    // ── FireSkill replica with isAIPress=true (the Auto Combo gate bypass) ───────────────────────────────────────────
+    // Returns false ONLY when FirePlaySkillEvent was never invoked — the caller then falls back to FireSkill(). Once
+    // the event has been fired we report true even if the cancel throws: falling back then would double-cast.
+    private bool MkFireAiPress(object indicatorMgr, object? pe, int skillId, out string tryGet, out string fireRet)
     {
+        tryGet = "n/a"; fireRet = "n/a";
+        string? why = _mkAiPressMissing;
+        object? sim = null, scdMgr = null, data = null;
         try
         {
-            if (!_services.Lua.Ready) return "ERR";
-            const string chunk = @"
-rawset(_G,'_rm_mkab','ERR')
-rawset(_G,'_rm_mkab_was',nil)
-pcall(function()
-  if Z.EntityMgr==nil or Z.LocalAttr==nil then return end
-  local pe=(Z.EntityMgr).PlayerEnt
-  if not pe then return end
-  local a=pe:GetLuaAttr(Z.LocalAttr.EAutoBattleSwitch)
-  local v=nil
-  if a then v=a.Value end
-  rawset(_G,'_rm_mkab', tostring(v))
-  if v==true then
-    pe:SetLuaAttr(Z.LocalAttr.EAutoBattleSwitch, false)
-    rawset(_G,'_rm_mkab_was',true)
-  end
-end)";
-            _services.Lua.DoString(chunk);
-            return _services.Lua.ReadGlobalString("_rm_mkab") ?? "ERR";
+            if (why == null && (pe == null || !_mkPlayerEntType!.IsInstanceOfType(pe))) why = "PlayerEnt null/untyped";
+            if (why == null && (sim = _mkSkillInputMgr!.GetValue(_mkSkillInputComp!.GetValue(pe))) == null) why = "SkillInputMgr null";
+            if (why == null && (scdMgr = StellarInterop.GetSingleton(_mkScdMgrType!)) == null) why = "SkillControlDataMgr.Instance null";
+            if (why == null)
+            {
+                var args = new object?[] { skillId, null };   // out SkillControlData lands in args[1]
+                bool got = _mkTryGetScd!.Invoke(scdMgr, args) is true;
+                data = args[1];
+                tryGet = got.ToString();
+                if (!got || data == null) why = $"TryGetSkillControlData({skillId}) failed";
+            }
         }
-        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] auto-combo suspend threw: {ex.Message}"); return "ERR"; }
-    }
+        catch (Exception ex) { why = $"resolve threw: {ex.InnerException?.Message ?? ex.Message}"; }
 
-    // Safe to call unconditionally: a no-op unless the suspend chunk parked _rm_mkab_was. The flag is cleared even if
-    // the SetLuaAttr inside fails (outer pcall + trailing rawset) so a stale flag can't re-enable Auto Combo later.
-    private void MkRestoreAutoCombo()
-    {
-        try
+        if (why != null)
         {
-            _services.Lua.DoString(
-                "pcall(function() if rawget(_G,'_rm_mkab_was') then local pe=(Z.EntityMgr).PlayerEnt if pe then " +
-                "pe:SetLuaAttr(Z.LocalAttr.EAutoBattleSwitch, true) end end end) " +
-                "rawset(_G,'_rm_mkab_was',nil)");
+            if (!_mkFallbackLogged) { _mkFallbackLogged = true; _services.Log.Warning($"[MarkPresets] aipress path unavailable ({why}) — falling back to FireSkill (no marks while Auto Combo is on)"); }
+            return false;
         }
-        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] auto-combo RESTORE threw: {ex.Message}"); }
+
+        bool ok = false;
+        try { ok = _mkFirePlaySkillEvent!.Invoke(sim, new object[] { data!, true, true, true }) is true; fireRet = ok.ToString(); }
+        catch (Exception ex) { fireRet = "ERR"; _services.Log.Warning($"[MarkPresets] FirePlaySkillEvent threw: {ex.InnerException?.Message ?? ex.Message}"); }
+        // Mirror FireSkill's `end(false, !ok)` — closes the indicator we opened with BeginIndicator.
+        try { _mkTryCancelIndicator!.Invoke(indicatorMgr, new object[] { false, !ok }); }
+        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] TryCancelIndicator threw: {ex.InnerException?.Message ?? ex.Message}"); }
+        return true;
     }
 
-    // ── Entity-level indicator position + diagnostic reads (all best-effort, never throw) ────────────────────────
+    // ── Entity-level indicator position/rotation + diagnostic reads (all best-effort, never throw) ─────────────────
     private bool MkSetEntityIndicatorPos(object? playerEnt, Vector3 target)
     {
         if (playerEnt == null || _mkSetIndicatorPos == null) return false;
         try { _mkSetIndicatorPos.Invoke(null, new object[] { playerEnt, target }); return true; }
         catch (Exception ex) { _services.Log.Warning($"[MarkPresets] SetIndicatorPos threw: {ex.InnerException?.Message ?? ex.Message}"); return false; }
+    }
+
+    private void MkSetEntityIndicatorRot(object? playerEnt, Quaternion rot)
+    {
+        if (playerEnt == null || _mkSetIndicatorRot == null) return;
+        try { _mkSetIndicatorRot.Invoke(null, new object[] { playerEnt, rot }); }
+        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] SetIndicatorRot threw: {ex.InnerException?.Message ?? ex.Message}"); }
     }
 
     private string MkEntityIndicatorPosStr(object? playerEnt)
@@ -162,23 +186,11 @@ end)";
         catch { return "ERR"; }
     }
 
-    private string MkIsEnableStr(object mgr)
-    {
-        if (_mkIsEnable == null) return "n/a";
-        try { return _mkIsEnable.GetValue(mgr)?.ToString() ?? "null"; } catch { return "ERR"; }
-    }
-
-    private string MkCheckEnableStr(object mgr, int skillId)
-    {
-        if (_mkCheckIndicatorEnable == null) return "n/a";
-        try { return _mkCheckIndicatorEnable.Invoke(mgr, new object[] { skillId, false })?.ToString() ?? "null"; }
-        catch { return "ERR"; }
-    }
-
-    private static Vector3 MkReadVec3(IntPtr ptr, int off) => new(
+    private static Quaternion MkReadQuat(IntPtr ptr, int off) => new(
         BitConverter.Int32BitsToSingle(Marshal.ReadInt32(ptr + off + 0)),
         BitConverter.Int32BitsToSingle(Marshal.ReadInt32(ptr + off + 4)),
-        BitConverter.Int32BitsToSingle(Marshal.ReadInt32(ptr + off + 8)));
+        BitConverter.Int32BitsToSingle(Marshal.ReadInt32(ptr + off + 8)),
+        BitConverter.Int32BitsToSingle(Marshal.ReadInt32(ptr + off + 12)));
 
     private static string MkFmt(Vector3 v) => $"({v.x:F2},{v.y:F2},{v.z:F2})";
 
