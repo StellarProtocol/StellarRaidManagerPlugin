@@ -17,7 +17,9 @@ namespace Stellar.RaidManager;
 //
 // Placement (write a punctuate mark at an arbitrary world Vector3, no human aiming):
 //   ZIndicatorMgr (Panda.ZGame, ZSingleton) → BeginIndicator(200+slot, 1100+slot) → overwrite the PRIVATE Vector3
-//   field indicatorPos_ (resolve BY NAME, never hard-code 0x80 — version-brittle) → FireSkill(). All three calls
+//   field indicatorPos_ (resolve BY NAME, never hard-code 0x80 — version-brittle) → fire. "Fire" is now a FireSkill
+//   REPLICA with isAIPress=true (Plugin.Marks.AutoCombo.cs) so Auto Combo can't swallow it; FireSkill() itself is
+//   only the fallback when that path doesn't resolve. All three calls
 //   must run back-to-back in ONE synchronous main-thread callback BEFORE this frame's LateUpdate (LateUpdate
 //   re-derives indicatorPos_ from the live cursor). The load queue drains in Framework.Update, which satisfies
 //   that timing exactly. ⚠️ do NOT Harmony-patch ZIndicatorMgr.begin(in IndicatorData) — in-struct trampoline crash;
@@ -86,10 +88,32 @@ public sealed partial class Plugin
             int off = MkFieldOffset(klass, "indicatorPos_");
             if (off < 0) { _services.Log.Warning("[MarkPresets] indicatorPos_ offset not found (game update?)"); return false; }
 
+            // Auto Combo-safe fire path (Plugin.Marks.AutoCombo.cs): FireSkill's FirePlaySkillEvent passes
+            // isAIPress=false, which auto-battle swallows — so we replay FireSkill's steps with isAIPress=true.
+            MkResolveExt();
+            object? pe = MkPlayerEntity();
+            string isAuto = MkIsAutoBattleStr(pe);
+            int skillId = MkSkillId(slot);
             // BeginIndicator seeds the reticle; overwrite AFTER so our chosen point wins the same-frame race.
-            _mkBeginIndicator!.Invoke(mgr, new object[] { MkSlotId(slot), MkSkillId(slot) });
-            MkWriteVec3(ptr, off, target);
-            _mkFireSkill!.Invoke(mgr, null);
+            object? began = _mkBeginIndicator!.Invoke(mgr, new object[] { MkSlotId(slot), skillId });
+            MkWriteVec3(ptr, off, target);   // mgr field — parity with the validated FireSkill recipe
+            // Entity-level store = what the cast actually reads (GetPassiveSelectPoint → GetIndicatorPos).
+            MkSetEntityIndicatorPos(pe, target);
+            int rotOff = MkFieldOffset(klass, "indicatorRot_");
+            if (rotOff >= 0) MkSetEntityIndicatorRot(pe, MkReadQuat(ptr, rotOff));   // keep the reticle's own facing
+
+            string path = "aipress";
+            if (!MkFireAiPress(mgr, pe, skillId, out string tryGet, out string fireRet))
+            {
+                path = "fireskill";   // aipress unresolved — old path (still works with Auto Combo OFF)
+                _mkFireSkill!.Invoke(mgr, null);
+            }
+            string entPosAfter = MkEntityIndicatorPosStr(pe);
+            MkNoteIntended(slot, target);
+
+            _services.Log.Info(
+                $"[MarkPresets] place slot={slot} target={MkFmt(target)} isAutoBattle={isAuto} begin={began ?? "null"} " +
+                $"path={path} tryGet={tryGet} fire={fireRet} entPosAfter={entPosAfter} player={(pe != null ? "ok" : "null")}");
             return true;
         }
         catch (Exception ex) { _services.Log.Warning($"[MarkPresets] place slot {slot} threw: {ex.Message}"); return false; }

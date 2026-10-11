@@ -173,6 +173,7 @@ public sealed partial class Plugin
         // First-open anchor re-apply for the share-code popups (Plugin.Marks.ImportWindow.cs / .ExportWindow.cs).
         TickPopupReposition(_importWindow, _importRect, ref _importRepositionTicks);
         TickPopupReposition(_exportWindow, _exportRect, ref _exportRepositionTicks);
+        MkTickVerify(deltaTime);   // one-shot post-placement verification (Plugin.Marks.AutoCombo.cs)
 
         if (_loadQueue.Count > 0)
         {
@@ -181,6 +182,7 @@ public sealed partial class Plugin
             MkPlaceAt(m.Slot, target);
             if (_loadQueue.Count == 0)
             {
+                MkArmVerify();   // intended-vs-actual log ~0.5 s from now (Plugin.Marks.AutoCombo.cs)
                 _marksStatus = _loc.T("rm.marks.stepPlaced");
                 _marksWindow?.MarkDirty();
             }
@@ -373,6 +375,7 @@ public sealed partial class Plugin
         // Applying always clears the board first. Step 0 is the blank anchor → clears and places nothing.
         MkClearMarks();
         _loadQueue.Clear();
+        MkVerifyReset();   // a new apply supersedes any pending verification
         foreach (var m in step.Marks) _loadQueue.Enqueue(m);
 
         if (i == 0)
