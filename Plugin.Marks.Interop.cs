@@ -86,10 +86,36 @@ public sealed partial class Plugin
             int off = MkFieldOffset(klass, "indicatorPos_");
             if (off < 0) { _services.Log.Warning("[MarkPresets] indicatorPos_ offset not found (game update?)"); return false; }
 
-            // BeginIndicator seeds the reticle; overwrite AFTER so our chosen point wins the same-frame race.
-            _mkBeginIndicator!.Invoke(mgr, new object[] { MkSlotId(slot), MkSkillId(slot) });
-            MkWriteVec3(ptr, off, target);
-            _mkFireSkill!.Invoke(mgr, null);
+            // Auto Combo workaround + diagnostics (Plugin.Marks.AutoCombo.cs): suspend the live switch for the whole
+            // Begin → write → Fire sequence and ALWAYS restore it in the finally, even if a call below throws.
+            MkResolveExt();
+            object? pe = MkPlayerEntity();
+            string abBefore = MkSuspendAutoCombo();
+            string isAuto = MkIsAutoBattleStr(pe);   // ECS state AFTER the switch suspend (does it follow same-frame?)
+            try
+            {
+                string entPosBefore = MkEntityIndicatorPosStr(pe);
+                // BeginIndicator seeds the reticle; overwrite AFTER so our chosen point wins the same-frame race.
+                object? began = _mkBeginIndicator!.Invoke(mgr, new object[] { MkSlotId(slot), MkSkillId(slot) });
+                string isEnable = MkIsEnableStr(mgr);
+                string checkEnable = MkCheckEnableStr(mgr, MkSkillId(slot));
+                MkWriteVec3(ptr, off, target);
+                bool entSet = MkSetEntityIndicatorPos(pe, target);   // second target store (IndicatorPosComponent)
+                Vector3 readback = MkReadVec3(ptr, off);
+                _mkFireSkill!.Invoke(mgr, null);
+                string entPosAfter = MkEntityIndicatorPosStr(pe);
+                MkNoteIntended(slot, target);
+
+                _services.Log.Info(
+                    $"[MarkPresets] place slot={slot} target={MkFmt(target)} autoSwitch={abBefore} isAutoBattle={isAuto} " +
+                    $"begin={began ?? "null"} isEnable={isEnable} checkEnable={checkEnable} entSet={entSet} " +
+                    $"entPosBefore={entPosBefore} entPosAfterFire={entPosAfter} indicatorPos_PreFire={MkFmt(readback)} " +
+                    $"player={(pe != null ? "ok" : "null")}");
+            }
+            finally
+            {
+                if (abBefore == "true") MkRestoreAutoCombo();
+            }
             return true;
         }
         catch (Exception ex) { _services.Log.Warning($"[MarkPresets] place slot {slot} threw: {ex.Message}"); return false; }
