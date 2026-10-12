@@ -87,6 +87,8 @@ internal struct MinimapDot
     public bool  Hidden;               // fast-path read failed (stale/destroyed entity) — skip until the next scan
     public float Facing;               // yaw degrees (upstream convention), valid when HasFacing — local player arrow
     public bool  HasFacing;
+    public float CamYaw;               // camera yaw degrees (same convention), valid when HasCamYaw — local camera cone
+    public bool  HasCamYaw;
     public bool  Dead;                 // team member dead → dimmed × (overrides mechanic colour)
     public bool  Ball;                 // raid pinball ball (Monster kind) → drawn as a large circle, not a triangle
 }

@@ -11,7 +11,7 @@ namespace Stellar.RaidManager;
 // upload is all a redraw needs). The paint happens lazily inside the texture getter, which the framework only polls
 // while the window is active, and only when the tracker's MapVersion moved (≈ 5 Hz in the raid) — idle otherwise.
 // Window style mirrors the callout HUD: HUD category, Borderless, EditModeDragOnly, Passive (pure info, no clicks).
-// No BringToFront (CLAUDE.md rule 5). Config keys: mech_map_enabled / _markers / _hidenormal / _floor / _scale.
+// No BringToFront (CLAUDE.md rule 5). Config keys: mech_map_enabled / _markers / _hidenormal / _floor / _scale / _camcone.
 //
 // MINIMAP SIZE (slider 0.5–2.0×, step 0.1, config mech_map_scale, default 1.0×; port of Experiment dbcc76f): the
 // texture AND the on-screen size are round(300 × scale) px — still 1:1 texels, so a bigger map is re-RENDERED at the
@@ -35,6 +35,7 @@ public sealed partial class Plugin
     private bool _mechMapMarkers = true;                   // "Show party markers" (default ON)
     private bool _mechMapFloor = true;                     // "Show floor damage" (raid grid, default ON)
     private bool _mechMapHideNormal;                       // "Hide teammates without a mechanic" (default OFF)
+    private bool _mechMapCamCone;                          // "Camera view cone" (default OFF; no camera reads while off)
     private int  _mechMapPaintedVersion = -1;              // tracker MapVersion last painted; -2 = test view painted
 
     private void InitMechanicMinimap()
@@ -42,6 +43,7 @@ public sealed partial class Plugin
         _mechMapEnabled = _cfg.Get<bool>("mech_map_enabled", false);
         _mechMapMarkers = _cfg.Get<bool>("mech_map_markers", true);
         _mechMapHideNormal = _cfg.Get<bool>("mech_map_hidenormal", false);
+        _mechMapCamCone = _cfg.Get<bool>("mech_map_camcone", false);
         _mechMapFloor = _cfg.Get<bool>("mech_map_floor", true);
         _mechMapScale = Math.Clamp(_cfg.Get<float>("mech_map_scale", 1f), MechMapScaleMin, MechMapScaleMax);
         CreateMechMapPainter();
@@ -111,6 +113,8 @@ public sealed partial class Plugin
         _mechTracker.ShowMarkers = _mechMapMarkers;
         _mechMapPainter.ShowMarkers = _mechMapMarkers;
         _mechMapPainter.HideNormalTeammates = _mechMapHideNormal;
+        _mechTracker.ShowCameraCone = _mechMapCamCone;
+        _mechMapPainter.ShowCameraCone = _mechMapCamCone;
         _mechTracker.ShowFloor = _mechMapFloor;
         _mechMapPaintedVersion = int.MinValue;
     }

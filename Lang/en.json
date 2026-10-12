@@ -102,6 +102,7 @@
   "rm.mech.list.order.urgent": "Most urgent first",
   "rm.mech.list.textSize": "Text size",
   "rm.mech.list.title": "Callout List",
+  "rm.mech.map.camCone": "Camera view cone",
   "rm.mech.map.enable": "Show minimap",
   "rm.mech.map.floor": "Floor damage (raid)",
   "rm.mech.map.hideNormal": "Hide teammates without a mechanic",

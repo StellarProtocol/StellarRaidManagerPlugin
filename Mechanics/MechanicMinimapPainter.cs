@@ -48,6 +48,12 @@ internal sealed class MechanicMinimapPainter : IDisposable
     // hideNormalTeammates: teammates with no mechanic colour (incl. safe-zone status) aren't drawn — dead ones too; the
     // local player is always drawn.
     public bool HideNormalTeammates;
+    // "Camera view cone" (default OFF): soft white wedge from the local marker along the camera yaw (dot.CamYaw), like
+    // the game's own minimap. Fixed 90° (yaw ± CamConeHalfDeg); length is a fixed canvas fraction (CamConeRadiusPx at
+    // the base canvas, × _k) converted back to world units, so it reads the same at every arena scale while its
+    // DIRECTION goes through the projector (origin / rotationQuarters / axis flip) exactly like the facing arrow.
+    public bool ShowCameraCone;
+    private const float CamConeHalfDeg = 45f, CamConeRadiusPx = 70f, CamConeAlpha = 0.2f;
 
     // Party markers 1..6 as BADGES ("pins", not text — so they can't be confused with the white "1F" tile labels):
     // a filled disc (r 8 ≈ 16 px) in the marker colour (upstream markerColors m1..m6), dark outline, soft drop shadow,
@@ -85,6 +91,9 @@ internal sealed class MechanicMinimapPainter : IDisposable
         else _r.RestoreBase();
 
         foreach (var reg in v.Regions) if (reg.Kind != MinimapRegionKind.Text) DrawRegion(reg);
+        // Camera cone: above arena + danger regions, under every dot / arrow.
+        if (ShowCameraCone)
+            foreach (var d in v.Dots) if (d.Kind == MinimapDotKind.Local && d.HasCamYaw && !d.Hidden) DrawCameraCone(d);
         // Monsters under the team, local player last (on top).
         foreach (var d in v.Dots) if (d.Kind == MinimapDotKind.Monster)  DrawDot(d);
         foreach (var d in v.Dots)
@@ -301,18 +310,31 @@ internal sealed class MechanicMinimapPainter : IDisposable
     // outline 0.92 @ 1.5 px. A full 360° sector (orbs/pools) closes back through the centre like upstream's path.
     private float[] _poly = new float[2 * 64];
 
-    private void DrawSector(in MinimapRegion reg, ColorRgba c)
+    private void DrawSector(in MinimapRegion reg, ColorRgba c) =>
+        FillStroke(SectorPoly(reg.X, reg.Z, reg.ROuter, reg.StartDeg, reg.EndDeg), c, 0.24f, 0.92f);
+
+    // Sector outline into _poly (apex + arc), world coords through the projector; returns the point count.
+    private int SectorPoly(float x, float z, float radius, float startDeg, float endDeg)
     {
-        int steps = Math.Max(6, (int)MathF.Ceiling(MathF.Abs(reg.EndDeg - reg.StartDeg) / 8f));
+        int steps = Math.Max(6, (int)MathF.Ceiling(MathF.Abs(endDeg - startDeg) / 8f));
         int n = steps + 2;
         if (_poly.Length < 2 * n) _poly = new float[2 * n];
-        (_poly[0], _poly[1]) = P(reg.X, reg.Z);
+        (_poly[0], _poly[1]) = P(x, z);
         for (int i = 0; i <= steps; i++)
         {
-            float rad = (reg.StartDeg + (reg.EndDeg - reg.StartDeg) * i / steps) * MathF.PI / 180f;
-            (_poly[2 * (i + 1)], _poly[2 * (i + 1) + 1]) = P(reg.X + MathF.Sin(rad) * reg.ROuter, reg.Z + MathF.Cos(rad) * reg.ROuter);
+            float rad = (startDeg + (endDeg - startDeg) * i / steps) * MathF.PI / 180f;
+            (_poly[2 * (i + 1)], _poly[2 * (i + 1) + 1]) = P(x + MathF.Sin(rad) * radius, z + MathF.Cos(rad) * radius);
         }
-        FillStroke(n, c, 0.24f, 0.92f);
+        return n;
+    }
+
+    // Camera cone = the Sector path (same world-yaw convention / projection), fill only — no outline, so it stays a
+    // soft hint under the dots instead of reading like a mechanic region.
+    private void DrawCameraCone(in MinimapDot d)
+    {
+        if (_scale <= 0f) return;
+        int n = SectorPoly(d.X, d.Z, K(CamConeRadiusPx) / _scale, d.CamYaw - CamConeHalfDeg, d.CamYaw + CamConeHalfDeg);
+        _r.FillPolygon(_poly, n, White, CamConeAlpha);
     }
 
     private void DrawPolygon(in MinimapRegion reg, ColorRgba c)

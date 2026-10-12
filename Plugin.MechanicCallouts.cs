@@ -178,6 +178,12 @@ public sealed partial class Plugin
                     ApplyMechMapOptions();
                     SetMechBool("mech_map_hidenormal", v);
                 }),
+                MechToggleRow("rm.mech.map.camCone", () => _mechMapCamCone, v =>
+                {
+                    _mechMapCamCone = v;
+                    ApplyMechMapOptions();
+                    SetMechBool("mech_map_camcone", v);
+                }),
                 MechToggleRow("rm.mech.map.floor", () => _mechMapFloor, v =>
                 {
                     _mechMapFloor = v;

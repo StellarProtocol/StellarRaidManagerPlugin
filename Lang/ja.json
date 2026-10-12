@@ -102,6 +102,7 @@
   "rm.mech.list.order.urgent": "緊急度の高い順",
   "rm.mech.list.textSize": "文字サイズ",
   "rm.mech.list.title": "通知リスト",
+  "rm.mech.map.camCone": "カメラの視野範囲",
   "rm.mech.map.enable": "ミニマップを表示",
   "rm.mech.map.floor": "床の損傷（レイド）",
   "rm.mech.map.hideNormal": "ギミック対象外の味方を隠す",

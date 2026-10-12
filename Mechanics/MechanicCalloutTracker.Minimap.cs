@@ -135,6 +135,7 @@ internal sealed partial class MechanicCalloutTracker
                     // Facing arrow: rendered model yaw, else the server AttrDir (centidegrees / 100).
                     if (TryGoYaw(e.GoComp, out float yaw)) { dot.Facing = yaw; dot.HasFacing = true; }
                     else if (!float.IsNaN(e.Facing)) { dot.Facing = e.Facing; dot.HasFacing = true; }
+                    UpdateCameraCone(ref dot);   // camera view cone yaw (option, Minimap.Camera.cs)
                 }
                 _mapDotGo.Add(e.GoComp);
                 _map.Dots.Add(dot);
@@ -194,6 +195,8 @@ internal sealed partial class MechanicCalloutTracker
             if (d.Kind == MinimapDotKind.Local && TryGoYaw(go, out float yaw)
                 && (!d.HasFacing || MathF.Abs(DeltaDeg(yaw, d.Facing)) > 2f))
             { d.Facing = yaw; d.HasFacing = true; changed = true; }
+            // Camera cone: same cadence and the same 2° repaint threshold as the arrow (Minimap.Camera.cs).
+            if (d.Kind == MinimapDotKind.Local && UpdateCameraCone(ref d)) changed = true;
             if (!changed) continue;
             dots[i] = d;
             moved = true;
