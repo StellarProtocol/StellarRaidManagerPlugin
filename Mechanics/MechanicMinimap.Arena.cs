@@ -64,18 +64,18 @@ internal static class MinimapArenas
     { Key = "reef:boss", Cx = -330f, Cy = 27f, Cz = 101f, HalfX = 33f, HalfZ = 27f, Rot = 3, YRange = 24f, Margin = 1e4f }
         .Rect(33f, 27f);
 
-    // ── s3-tina-mindrealm/arena.ts: centre (0, 110, 0), view 20×20 (cabinet ring r16 + buffer), rotation 1,
+    // ── s3-tina-mindrealm/arena.ts: centre (0, 110, 0), view 20×20 (cabinet ring r16 + buffer), rotation 3 (upstream 1, flipped 180° by user request),
     // Y band ±15 (excludes the layer-1 sub-bosses at Y≈79), boss-area margin 6.
     public static readonly MinimapArenaSpec Tina = new MinimapArenaSpec
-    { Key = "tina", Cx = 0f, Cy = 110f, Cz = 0f, HalfX = 20f, HalfZ = 20f, Rot = 1, YRange = 15f, Margin = 6f };
+    { Key = "tina", Cx = 0f, Cy = 110f, Cz = 0f, HalfX = 20f, HalfZ = 20f, Rot = 3, YRange = 15f, Margin = 6f };
 
-    // ── s3-cursed-tomb/arena.ts: centre (69, 62.2, −307), 32×30, rotation 1, Y ±18, margin 4; outline rect + a 3×3
+    // ── s3-cursed-tomb/arena.ts: centre (69, 62.2, −307), 32×30, rotation 3 (upstream 1, flipped 180° by user request), Y ±18, margin 4; outline rect + a 3×3
     // floor grid of 13.5-unit cells (edges ±20.25, ±6.75).
     public static readonly MinimapArenaSpec Tomb = TombSpec();
 
     private static MinimapArenaSpec TombSpec()
     {
-        var s = new MinimapArenaSpec { Key = "tomb", Cx = 69f, Cy = 62.2f, Cz = -307f, HalfX = 32f, HalfZ = 30f, Rot = 1, YRange = 18f, Margin = 4f }
+        var s = new MinimapArenaSpec { Key = "tomb", Cx = 69f, Cy = 62.2f, Cz = -307f, HalfX = 32f, HalfZ = 30f, Rot = 3, YRange = 18f, Margin = 4f }
             .Rect(32f, 30f);
         const float sp = 13.5f, half = sp * 1.5f;
         foreach (float e in new[] { -half, -sp / 2f, sp / 2f, half })
