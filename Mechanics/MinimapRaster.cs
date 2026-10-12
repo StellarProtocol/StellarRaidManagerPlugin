@@ -33,26 +33,10 @@ internal sealed class MinimapRaster : IDisposable
     // Boxed texture for GameTextureElement (created lazily on the main thread at first upload).
     public object? Texture => _tex;
 
-    // "Minimap opacity" (whole picture): GameTextureElement has no colour/alpha of its own, so the alpha bytes are
-    // scaled through a LUT right before the upload. The scale never compounds: every Paint starts from Clear() or
-    // RestoreBase(), and the base copy is saved BEFORE this runs. 1 = no pass (today's look).
-    public float Opacity = 1f;
-    private readonly byte[] _alphaLut = new byte[256];
-    private float _lutFor = -1f;
-
     public void Upload()
     {
         _tex ??= new Texture2D(Size, Size, TextureFormat.RGBA32, false)
             { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
-        if (Opacity < 0.999f)
-        {
-            if (_lutFor != Opacity)
-            {
-                for (int a = 0; a < 256; a++) _alphaLut[a] = (byte)MathF.Round(a * Math.Clamp(Opacity, 0f, 1f));
-                _lutFor = Opacity;
-            }
-            for (int i = 3; i < _px.Length; i += 4) _px[i] = _alphaLut[_px[i]];
-        }
         _tex.LoadRawTextureData(_pin.AddrOfPinnedObject(), _px.Length);
         _tex.Apply(false);
     }

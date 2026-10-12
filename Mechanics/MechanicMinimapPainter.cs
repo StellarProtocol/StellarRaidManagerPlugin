@@ -86,8 +86,9 @@ internal sealed partial class MechanicMinimapPainter : IDisposable
     public void Paint(MinimapView v)
     {
         SetProjector(v);
-        // The game-map layer is world-anchored (origin) and changes with the art load → both are in the key.
-        string key = $"{v.LayoutKey}|{v.RotationQuarters}|{v.HalfX}|{v.HalfZ}|{v.OriginX}|{v.OriginZ}|art{Art?.Version ?? 0}";
+        // The game-map layer is world-anchored (origin) and changes with the art load; the background opacity is baked
+        // into the same layer → all three are in the key.
+        string key = $"{v.LayoutKey}|{v.RotationQuarters}|{v.HalfX}|{v.HalfZ}|{v.OriginX}|{v.OriginZ}|art{Art?.Version ?? 0}|bg{BgOpacity}";
         if (key != _baseKey) { DrawBase(v); _r.SaveBase(); _baseKey = key; }
         else _r.RestoreBase();
 
@@ -123,7 +124,7 @@ internal sealed partial class MechanicMinimapPainter : IDisposable
     {
         _r.Clear();
         float s = _r.Size;
-        _r.FillRect(0, 0, s, s, Bg, 0.68f);
+        _r.FillRect(0, 0, s, s, Bg, BgOpacity);   // "Background opacity" (.GameMap.cs), default 0.68 = upstream
         DrawGameMap();   // optional game radar art — bottom-most layer, over the background only (.GameMap.cs)
         _r.StrokeRect(K(1f), K(1f), s - K(1f), s - K(1f), K(2f), Border, 0.72f);
         var (ox, oy) = L(0, 0);
