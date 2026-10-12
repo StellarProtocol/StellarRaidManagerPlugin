@@ -91,10 +91,10 @@ internal static class MinimapArenas
     { Key = "wasteland", Cx = -25.05f, Cy = 129.06f, Cz = 39.86f, HalfX = 22f, HalfZ = 22f, Rot = 0, YRange = 18f, Margin = 4f }
         .Rect(22f, 22f);
 
-    // ── s3-giant-tower/arena.ts: centre (−187.5, 89, −385), 28×28, rotation 1, Y ±22, margin 4; outline rect + portal
+    // ── s3-giant-tower/arena.ts: centre (−187.5, 89, −385), 28×28, rotation 3 (upstream 1, flipped 180° by user request), Y ±22, margin 4; outline rect + portal
     // ring r20. Upstream draws NO regions in this scene (portals / gravity are dot colours and rows only).
     public static readonly MinimapArenaSpec Giant = new MinimapArenaSpec
-    { Key = "giant", Cx = -187.5f, Cy = 89f, Cz = -385f, HalfX = 28f, HalfZ = 28f, Rot = 1, YRange = 22f, Margin = 4f }
+    { Key = "giant", Cx = -187.5f, Cy = 89f, Cz = -385f, HalfX = 28f, HalfZ = 28f, Rot = 3, YRange = 22f, Margin = 4f }
         .Rect(28f, 28f);
 
     static MinimapArenas() { ReefMatrix.Circles.Add(16f); Tina.Circles.Add(16f); Giant.Circles.Add(20f); }
