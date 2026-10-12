@@ -166,6 +166,7 @@ public sealed partial class Plugin
             new ConditionalElement(() => _mechMapEnabled, MechIndent(
                 MechSliderRow("rm.mech.map.size", () => _mechMapScale, SetMechMapScale, MechMapScaleMin, MechMapScaleMax,
                     () => $"{_mechMapScale:0.0}x"),   // Plugin.MechanicMinimap.cs
+                MechMapOpacityRow(),         // Plugin.MechanicMinimap.GameMap.cs
                 MechToggleRow("rm.mech.map.markers", () => _mechMapMarkers, v =>
                 {
                     _mechMapMarkers = v;
@@ -184,6 +185,7 @@ public sealed partial class Plugin
                     ApplyMechMapOptions();
                     SetMechBool("mech_map_camcone", v);
                 }),
+                MechToggleRow("rm.mech.map.gameMap", () => _mechMapGameMap, SetMechMapGameMap),   // .GameMap.cs
                 MechToggleRow("rm.mech.map.floor", () => _mechMapFloor, v =>
                 {
                     _mechMapFloor = v;

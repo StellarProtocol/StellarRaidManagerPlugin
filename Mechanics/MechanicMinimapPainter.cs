@@ -9,7 +9,7 @@ namespace Stellar.RaidManager;
 // entities) and the same colours/alphas/sizes as its defaults (settings-store.ts minimap defaults). Departures:
 // the canvas is square (upstream sizes its canvas to the view aspect — here the view is letterboxed), and the soft
 // shadow glow on mechanic-coloured dots is a translucent halo disc, and Text regions are painted after the entities.
-internal sealed class MechanicMinimapPainter : IDisposable
+internal sealed partial class MechanicMinimapPainter : IDisposable
 {
     private static readonly ColorRgba Bg       = Rgba(15, 23, 42, 1f);
     private static readonly ColorRgba Border   = Rgba(203, 213, 225, 1f);
@@ -86,7 +86,8 @@ internal sealed class MechanicMinimapPainter : IDisposable
     public void Paint(MinimapView v)
     {
         SetProjector(v);
-        string key = $"{v.LayoutKey}|{v.RotationQuarters}|{v.HalfX}|{v.HalfZ}";
+        // The game-map layer is world-anchored (origin) and changes with the art load → both are in the key.
+        string key = $"{v.LayoutKey}|{v.RotationQuarters}|{v.HalfX}|{v.HalfZ}|{v.OriginX}|{v.OriginZ}|art{Art?.Version ?? 0}";
         if (key != _baseKey) { DrawBase(v); _r.SaveBase(); _baseKey = key; }
         else _r.RestoreBase();
 
@@ -123,6 +124,7 @@ internal sealed class MechanicMinimapPainter : IDisposable
         _r.Clear();
         float s = _r.Size;
         _r.FillRect(0, 0, s, s, Bg, 0.68f);
+        DrawGameMap();   // optional game radar art — bottom-most layer, over the background only (.GameMap.cs)
         _r.StrokeRect(K(1f), K(1f), s - K(1f), s - K(1f), K(2f), Border, 0.72f);
         var (ox, oy) = L(0, 0);
         foreach (float half in v.Squares)
@@ -429,6 +431,14 @@ internal readonly struct MinimapProjector
     {
         (x, z) = Rot switch { 1 => (-z, x), 2 => (-x, -z), 3 => (z, -x), _ => (x, z) };
         return (Cx - z * Scale, Cy - x * Scale);
+    }
+
+    // Canvas pixel → WORLD x/z: the exact inverse of Project (undo scale/centre, inverse rotation, add the origin).
+    public (float X, float Z) Unproject(float px, float py)
+    {
+        float zr = (Cx - px) / Scale, xr = (Cy - py) / Scale;
+        var (x, z) = Rot switch { 1 => (zr, -xr), 2 => (-xr, -zr), 3 => (-zr, xr), _ => (xr, zr) };
+        return (x + Ox, z + Oz);
     }
 
 }
