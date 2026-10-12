@@ -12,7 +12,7 @@ namespace Stellar.RaidManager;
 // while the window is active, and only when the tracker's MapVersion moved (≈ 5 Hz in the raid) — idle otherwise.
 // Window style mirrors the callout HUD: HUD category, Borderless, EditModeDragOnly, Passive (pure info, no clicks).
 // No BringToFront (CLAUDE.md rule 5). Config keys: mech_map_enabled / _markers / _hidenormal / _floor / _scale / _camcone
-// / _gamemap / _bgopacity (the last two in Plugin.MechanicMinimap.GameMap.cs).
+// / _gamemap / _bgopacity (those two in Plugin.MechanicMinimap.GameMap.cs) / _rotation (Plugin.MechanicMinimap.Rotation.cs).
 //
 // MINIMAP SIZE (slider 0.5–2.0×, step 0.1, config mech_map_scale, default 1.0×; port of Experiment dbcc76f): the
 // texture AND the on-screen size are round(300 × scale) px — still 1:1 texels, so a bigger map is re-RENDERED at the
@@ -48,6 +48,7 @@ public sealed partial class Plugin
         _mechMapFloor = _cfg.Get<bool>("mech_map_floor", true);
         _mechMapScale = Math.Clamp(_cfg.Get<float>("mech_map_scale", 1f), MechMapScaleMin, MechMapScaleMax);
         InitMechMapGameMap();                   // .GameMap.cs — before the painter (it reads the opacity)
+        LoadMechMapRotation();                  // .Rotation.cs
         CreateMechMapPainter();
         if (_mechMapEnabled) RegisterMechMapHud();   // off ⇒ never registered (not even in the layout editor)
     }
@@ -119,6 +120,7 @@ public sealed partial class Plugin
         _mechMapPainter.ShowCameraCone = _mechMapCamCone;
         _mechTracker.ShowFloor = _mechMapFloor;
         _mechMapPainter.BgOpacity = _mechMapBgOpacity;
+        _mechMapPainter.UserQuarters = MechMapUserQuarters;
         _mechMapPaintedVersion = int.MinValue;
     }
 

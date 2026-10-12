@@ -167,6 +167,7 @@ public sealed partial class Plugin
                 MechSliderRow("rm.mech.map.size", () => _mechMapScale, SetMechMapScale, MechMapScaleMin, MechMapScaleMax,
                     () => $"{_mechMapScale:0.0}x"),   // Plugin.MechanicMinimap.cs
                 MechMapBgOpacityRow(),       // background + game map opacity (Plugin.MechanicMinimap.GameMap.cs)
+                MechMapRotationRow(),        // "Map rotation" dropdown (Plugin.MechanicMinimap.Rotation.cs)
                 MechToggleRow("rm.mech.map.markers", () => _mechMapMarkers, v =>
                 {
                     _mechMapMarkers = v;

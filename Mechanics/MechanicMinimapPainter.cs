@@ -53,6 +53,10 @@ internal sealed partial class MechanicMinimapPainter : IDisposable
     // the base canvas, × _k) converted back to world units, so it reads the same at every arena scale while its
     // DIRECTION goes through the projector (origin / rotationQuarters / axis flip) exactly like the facing arrow.
     public bool ShowCameraCone;
+    // "Map rotation" (dropdown): extra quarter turns on top of the arena's own RotationQuarters — goes through the
+    // projector, so every layer (art, grid, regions, dots, arrow, cone, labels, markers) turns together. Part of the
+    // static layer key → a change re-bakes once.
+    public int UserQuarters;
     private const float CamConeHalfDeg = 45f, CamConeRadiusPx = 70f, CamConeAlpha = 0.2f;
 
     // Party markers 1..6 as BADGES ("pins", not text — so they can't be confused with the white "1F" tile labels):
@@ -88,7 +92,7 @@ internal sealed partial class MechanicMinimapPainter : IDisposable
         SetProjector(v);
         // The game-map layer is world-anchored (origin) and changes with the art load; the background opacity is baked
         // into the same layer → all three are in the key.
-        string key = $"{v.LayoutKey}|{v.RotationQuarters}|{v.HalfX}|{v.HalfZ}|{v.OriginX}|{v.OriginZ}|art{Art?.Version ?? 0}|bg{BgOpacity}";
+        string key = $"{v.LayoutKey}|{v.RotationQuarters + UserQuarters}|{v.HalfX}|{v.HalfZ}|{v.OriginX}|{v.OriginZ}|art{Art?.Version ?? 0}|bg{BgOpacity}";
         if (key != _baseKey) { DrawBase(v); _r.SaveBase(); _baseKey = key; }
         else _r.RestoreBase();
 
@@ -112,7 +116,7 @@ internal sealed partial class MechanicMinimapPainter : IDisposable
     // ── Projection (MinimapProjector below) ─────────────────────────────────────────────────────────────────
     private void SetProjector(MinimapView v)
     {
-        _p = MinimapProjector.For(v, _r.Size);
+        _p = MinimapProjector.For(v, _r.Size, UserQuarters);
         _scale = _p.Scale;
     }
 
@@ -414,9 +418,11 @@ internal readonly struct MinimapProjector
     private MinimapProjector(float scale, float cx, float cy, int rot, int size, float ox, float oz)
     { Scale = scale; Cx = cx; Cy = cy; Rot = rot; Size = size; Ox = ox; Oz = oz; }
 
-    public static MinimapProjector For(MinimapView v, int size)
+    // extraQuarters = the user's "Map rotation" (same convention as RotationQuarters: +1 = 90° COUNTER-clockwise on
+    // screen — rot 0 has world +X up, rot 1 puts +X left), added on top of the arena's own orientation.
+    public static MinimapProjector For(MinimapView v, int size, int extraQuarters = 0)
     {
-        int rot = ((v.RotationQuarters % 4) + 4) % 4;
+        int rot = (((v.RotationQuarters + extraQuarters) % 4) + 4) % 4;
         bool quarter = rot % 2 == 1;
         float halfW = quarter ? v.HalfX : v.HalfZ, halfH = quarter ? v.HalfZ : v.HalfX;
         float pad = Pad * size / BasePx;
