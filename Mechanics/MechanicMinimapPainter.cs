@@ -9,7 +9,7 @@ namespace Stellar.RaidManager;
 // entities) and the same colours/alphas/sizes as its defaults (settings-store.ts minimap defaults). Departures:
 // the canvas is square (upstream sizes its canvas to the view aspect — here the view is letterboxed), and the soft
 // shadow glow on mechanic-coloured dots is a translucent halo disc, and Text regions are painted after the entities.
-internal sealed class MechanicMinimapPainter : IDisposable
+internal sealed partial class MechanicMinimapPainter : IDisposable
 {
     private static readonly ColorRgba Bg       = Rgba(15, 23, 42, 1f);
     private static readonly ColorRgba Border   = Rgba(203, 213, 225, 1f);
@@ -48,6 +48,16 @@ internal sealed class MechanicMinimapPainter : IDisposable
     // hideNormalTeammates: teammates with no mechanic colour (incl. safe-zone status) aren't drawn — dead ones too; the
     // local player is always drawn.
     public bool HideNormalTeammates;
+    // "Camera view cone" (default OFF): soft white wedge from the local marker along the camera yaw (dot.CamYaw), like
+    // the game's own minimap. Fixed 90° (yaw ± CamConeHalfDeg); length is a fixed canvas fraction (CamConeRadiusPx at
+    // the base canvas, × _k) converted back to world units, so it reads the same at every arena scale while its
+    // DIRECTION goes through the projector (origin / rotationQuarters / axis flip) exactly like the facing arrow.
+    public bool ShowCameraCone;
+    // "Map rotation" (dropdown): extra quarter turns on top of the arena's own RotationQuarters — goes through the
+    // projector, so every layer (art, grid, regions, dots, arrow, cone, labels, markers) turns together. Part of the
+    // static layer key → a change re-bakes once.
+    public int UserQuarters;
+    private const float CamConeHalfDeg = 45f, CamConeRadiusPx = 70f, CamConeAlpha = 0.2f;
 
     // Party markers 1..6 as BADGES ("pins", not text — so they can't be confused with the white "1F" tile labels):
     // a filled disc (r 8 ≈ 16 px) in the marker colour (upstream markerColors m1..m6), dark outline, soft drop shadow,
@@ -80,11 +90,16 @@ internal sealed class MechanicMinimapPainter : IDisposable
     public void Paint(MinimapView v)
     {
         SetProjector(v);
-        string key = $"{v.LayoutKey}|{v.RotationQuarters}|{v.HalfX}|{v.HalfZ}";
+        // The game-map layer is world-anchored (origin) and changes with the art load; the background opacity is baked
+        // into the same layer → all three are in the key.
+        string key = $"{v.LayoutKey}|{v.RotationQuarters + UserQuarters}|{v.HalfX}|{v.HalfZ}|{v.OriginX}|{v.OriginZ}|art{Art?.Version ?? 0}|bg{BgOpacity}";
         if (key != _baseKey) { DrawBase(v); _r.SaveBase(); _baseKey = key; }
         else _r.RestoreBase();
 
         foreach (var reg in v.Regions) if (reg.Kind != MinimapRegionKind.Text) DrawRegion(reg);
+        // Camera cone: above arena + danger regions, under every dot / arrow.
+        if (ShowCameraCone)
+            foreach (var d in v.Dots) if (d.Kind == MinimapDotKind.Local && d.HasCamYaw && !d.Hidden) DrawCameraCone(d);
         // Monsters under the team, local player last (on top).
         foreach (var d in v.Dots) if (d.Kind == MinimapDotKind.Monster)  DrawDot(d);
         foreach (var d in v.Dots)
@@ -101,7 +116,7 @@ internal sealed class MechanicMinimapPainter : IDisposable
     // ── Projection (MinimapProjector below) ─────────────────────────────────────────────────────────────────
     private void SetProjector(MinimapView v)
     {
-        _p = MinimapProjector.For(v, _r.Size);
+        _p = MinimapProjector.For(v, _r.Size, UserQuarters);
         _scale = _p.Scale;
     }
 
@@ -113,7 +128,8 @@ internal sealed class MechanicMinimapPainter : IDisposable
     {
         _r.Clear();
         float s = _r.Size;
-        _r.FillRect(0, 0, s, s, Bg, 0.68f);
+        _r.FillRect(0, 0, s, s, Bg, BgOpacity);   // "Background opacity" (.GameMap.cs), default 0.68 = upstream
+        DrawGameMap();   // optional game radar art — bottom-most layer, over the background only (.GameMap.cs)
         _r.StrokeRect(K(1f), K(1f), s - K(1f), s - K(1f), K(2f), Border, 0.72f);
         var (ox, oy) = L(0, 0);
         foreach (float half in v.Squares)
@@ -301,18 +317,31 @@ internal sealed class MechanicMinimapPainter : IDisposable
     // outline 0.92 @ 1.5 px. A full 360° sector (orbs/pools) closes back through the centre like upstream's path.
     private float[] _poly = new float[2 * 64];
 
-    private void DrawSector(in MinimapRegion reg, ColorRgba c)
+    private void DrawSector(in MinimapRegion reg, ColorRgba c) =>
+        FillStroke(SectorPoly(reg.X, reg.Z, reg.ROuter, reg.StartDeg, reg.EndDeg), c, 0.24f, 0.92f);
+
+    // Sector outline into _poly (apex + arc), world coords through the projector; returns the point count.
+    private int SectorPoly(float x, float z, float radius, float startDeg, float endDeg)
     {
-        int steps = Math.Max(6, (int)MathF.Ceiling(MathF.Abs(reg.EndDeg - reg.StartDeg) / 8f));
+        int steps = Math.Max(6, (int)MathF.Ceiling(MathF.Abs(endDeg - startDeg) / 8f));
         int n = steps + 2;
         if (_poly.Length < 2 * n) _poly = new float[2 * n];
-        (_poly[0], _poly[1]) = P(reg.X, reg.Z);
+        (_poly[0], _poly[1]) = P(x, z);
         for (int i = 0; i <= steps; i++)
         {
-            float rad = (reg.StartDeg + (reg.EndDeg - reg.StartDeg) * i / steps) * MathF.PI / 180f;
-            (_poly[2 * (i + 1)], _poly[2 * (i + 1) + 1]) = P(reg.X + MathF.Sin(rad) * reg.ROuter, reg.Z + MathF.Cos(rad) * reg.ROuter);
+            float rad = (startDeg + (endDeg - startDeg) * i / steps) * MathF.PI / 180f;
+            (_poly[2 * (i + 1)], _poly[2 * (i + 1) + 1]) = P(x + MathF.Sin(rad) * radius, z + MathF.Cos(rad) * radius);
         }
-        FillStroke(n, c, 0.24f, 0.92f);
+        return n;
+    }
+
+    // Camera cone = the Sector path (same world-yaw convention / projection), fill only — no outline, so it stays a
+    // soft hint under the dots instead of reading like a mechanic region.
+    private void DrawCameraCone(in MinimapDot d)
+    {
+        if (_scale <= 0f) return;
+        int n = SectorPoly(d.X, d.Z, K(CamConeRadiusPx) / _scale, d.CamYaw - CamConeHalfDeg, d.CamYaw + CamConeHalfDeg);
+        _r.FillPolygon(_poly, n, White, CamConeAlpha);
     }
 
     private void DrawPolygon(in MinimapRegion reg, ColorRgba c)
@@ -389,9 +418,11 @@ internal readonly struct MinimapProjector
     private MinimapProjector(float scale, float cx, float cy, int rot, int size, float ox, float oz)
     { Scale = scale; Cx = cx; Cy = cy; Rot = rot; Size = size; Ox = ox; Oz = oz; }
 
-    public static MinimapProjector For(MinimapView v, int size)
+    // extraQuarters = the user's "Map rotation" (same convention as RotationQuarters: +1 = 90° COUNTER-clockwise on
+    // screen — rot 0 has world +X up, rot 1 puts +X left), added on top of the arena's own orientation.
+    public static MinimapProjector For(MinimapView v, int size, int extraQuarters = 0)
     {
-        int rot = ((v.RotationQuarters % 4) + 4) % 4;
+        int rot = (((v.RotationQuarters + extraQuarters) % 4) + 4) % 4;
         bool quarter = rot % 2 == 1;
         float halfW = quarter ? v.HalfX : v.HalfZ, halfH = quarter ? v.HalfZ : v.HalfX;
         float pad = Pad * size / BasePx;
@@ -407,6 +438,14 @@ internal readonly struct MinimapProjector
     {
         (x, z) = Rot switch { 1 => (-z, x), 2 => (-x, -z), 3 => (z, -x), _ => (x, z) };
         return (Cx - z * Scale, Cy - x * Scale);
+    }
+
+    // Canvas pixel → WORLD x/z: the exact inverse of Project (undo scale/centre, inverse rotation, add the origin).
+    public (float X, float Z) Unproject(float px, float py)
+    {
+        float zr = (Cx - px) / Scale, xr = (Cy - py) / Scale;
+        var (x, z) = Rot switch { 1 => (zr, -xr), 2 => (-xr, -zr), 3 => (-zr, xr), _ => (xr, zr) };
+        return (x + Ox, z + Oz);
     }
 
 }

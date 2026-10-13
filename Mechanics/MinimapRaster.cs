@@ -65,6 +65,9 @@ internal sealed class MinimapRaster : IDisposable
         _px[i + 3] = (byte)(oa * 255f);
     }
 
+    // One canvas pixel (x right, y DOWN) — the painter's game-map layer, which samples its own colour per pixel.
+    public void BlendPixel(int x, int y, ColorRgba c, float a) => Blend(x, y, c, a);
+
     private static float Cov(float v) => v <= 0f ? 0f : v >= 1f ? 1f : v;
 
     private void Bounds(float x0, float y0, float x1, float y1, out int ax, out int ay, out int bx, out int by)
