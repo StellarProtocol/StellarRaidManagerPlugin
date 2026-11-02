@@ -103,7 +103,7 @@ public sealed partial class Plugin
 
     private bool AnyBanner()
     {
-        if (DangerBanner() != null || RingBanner() != null) return true;
+        if (DangerBanner() != null || RingBanner() != null || SpinBanner() != null) return true;
         foreach (var b in _banners) if (BannerLive(b)) return true;
         return false;
     }
@@ -115,6 +115,8 @@ public sealed partial class Plugin
         if (d != null) { if (i == 0) return d; i--; }
         var r = RingBanner();                                   // ring MOVE banner next (Plugin.MechanicAlerts.Ring.cs)
         if (r != null) { if (i == 0) return r; i--; }
+        var sp = SpinBanner();                                  // Spin Fan MOVE banner next (Plugin.MechanicAlerts.Spin.cs)
+        if (sp != null) { if (i == 0) return sp; i--; }
         int k = 0;
         foreach (var b in _banners)
             if (BannerLive(b) && k++ == i) return b;

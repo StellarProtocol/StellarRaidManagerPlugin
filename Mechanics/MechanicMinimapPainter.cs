@@ -317,8 +317,13 @@ internal sealed partial class MechanicMinimapPainter : IDisposable
     // outline 0.92 @ 1.5 px. A full 360° sector (orbs/pools) closes back through the centre like upstream's path.
     private float[] _poly = new float[2 * 64];
 
-    private void DrawSector(in MinimapRegion reg, ColorRgba c) =>
-        FillStroke(SectorPoly(reg.X, reg.Z, reg.ROuter, reg.StartDeg, reg.EndDeg), c, 0.24f, 0.92f);
+    // Style 3 = DANGER ZONE wedge (raid Spin Fan, approved option B): fill only at 0.45 in the region colour, no outline.
+    private void DrawSector(in MinimapRegion reg, ColorRgba c)
+    {
+        int n = SectorPoly(reg.X, reg.Z, reg.ROuter, reg.StartDeg, reg.EndDeg);
+        if (reg.Style == 3) _r.FillPolygon(_poly, n, c, 0.45f);
+        else FillStroke(n, c, 0.24f, 0.92f);
+    }
 
     // Sector outline into _poly (apex + arc), world coords through the projector; returns the point count.
     private int SectorPoly(float x, float z, float radius, float startDeg, float endDeg)

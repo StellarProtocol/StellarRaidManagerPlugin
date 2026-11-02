@@ -21,7 +21,7 @@ internal sealed partial class MechanicCalloutTracker
             case SceneKind.Raid:
                 if (!RaidRingGate(def)) { RaidPresetReturnRows(); RaidPhaseMappingRows(); }
                 else { _raidPresetRegions.Clear(); _phaseDanger.Clear(); ClearLocalDanger(); }
-                RaidPinballCastRows(); RaidPinballBallRows(); RaidRingRows(); RaidGolemLineRows();
+                RaidPinballCastRows(); RaidPinballBallRows(); RaidRingRows(); RaidGolemLineRows(); RaidSpinFanRows();
                 break;
             case SceneKind.SeaReef:        ReefMatrixCalloutRows(); ReefWaveRows(); ReefPizzaRows(); break;
             case SceneKind.WastelandCourt: WastelandBuffRows(); break;

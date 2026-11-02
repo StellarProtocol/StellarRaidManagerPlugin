@@ -55,6 +55,7 @@ internal sealed partial class MechanicCalloutTracker
                 {
                     if (probe) ProbeEntity(uuid, obj);
                     if (floor && mid != 0) FloorDummy(uuid, mid, obj);
+                    if (def.Kind == SceneKind.Raid && mid == SpinStopDummyId) SpinStopCandidate(uuid, obj, now);   // Rules.SpinFan.cs
                     if (wide) WideCheck(uuid, obj);
                     continue;
                 }
