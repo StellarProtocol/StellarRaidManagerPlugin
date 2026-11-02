@@ -22,6 +22,7 @@ internal static partial class McText
         ["Decay"] = "rm.mech.n.decay",
         ["Decay (Linked Trial)"] = "rm.mech.n.decayLinked",
         ["Golem Line"] = "rm.mech.n.golemLine",
+        ["Cannon Laser"] = "rm.mech.n.cannonLaser",
         ["Target"] = "rm.mech.n.golemTarget",
         ["Spin Fan"] = "rm.mech.n.spinFan",
         ["Clockwise"] = "rm.mech.n.clockwise",
