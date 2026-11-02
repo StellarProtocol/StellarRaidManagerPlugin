@@ -102,11 +102,14 @@ internal sealed partial class MechanicCalloutTracker
             }
             _map.Regions.AddRange(_raidPresetRegions);
             AddCrystalRegions();                                        // crystals + pressed tiles, on top of 1F/2F/3F (Crystals.cs)
+            AddGolemLineRegions();                                      // P2 golem red-carpet corridors (Rules.GolemLine.cs)
         }
         if (_raidArena == RaidArena.Kind.Ring && _arenaConfident) AddRingBand();   // latest ring band (Rules.Ring.cs)
         // Raid renders unlocalized; dot floor = the local player's (SameFloor). Pinball ball = slot 5, only while ARMED
-        // (Rules.Pinball.cs) — an idle pooled ball has no colour and so no dot.
-        AddDots(e => SameFloor(e.Pos.y), e => e.MonsterId == PinballBallId && BallArmed(e.Uuid) ? 5 : -1);
+        // (Rules.Pinball.cs) — an idle pooled ball has no colour and so no dot. A golem with a live Golem Line target =
+        // red 3 (it is not a boss, so it would otherwise not draw at the corridor's origin).
+        AddDots(e => SameFloor(e.Pos.y), e => e.MonsterId == PinballBallId && BallArmed(e.Uuid) ? 5
+                                            : e.MonsterId == GolemId && GolemLineActive(e.Uuid) ? 3 : -1);
     }
 
     private void ClearMap() { _map.Clear(); _mapDotGo.Clear(); }

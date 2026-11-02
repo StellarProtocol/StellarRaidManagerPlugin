@@ -17,6 +17,9 @@ internal sealed partial class MechanicCalloutTracker
         public int    Color, Order;
         public long   CreateMs, StartTick, DurMs;
         public readonly List<(long Uuid, int Safe)> Targets = new();   // Safe: -1 n/a, 0 out, 1 safe
+        public Dictionary<long, int>? Counts;  // per-target hit count (>1 → " ×N" after the name; raid Golem Line)
+        public float  PhaseSplitSec = -1f;     // two-phase countdown (McRow.PhaseSplitSec), -1 = plain countdown
+        public string Phase1 = "", Phase2 = "";
     }
 
     private readonly Dictionary<string, RowAcc> _acc  = new();
@@ -123,6 +126,7 @@ internal sealed partial class MechanicCalloutTracker
             if (!_rows.TryGetValue(kv.Key, out var row))
                 _rows[kv.Key] = row = new McRow { Key = kv.Key, CreateMs = -1, DurationMs = -1, Arrival = NextArrival() };
             row.Group = a.Group; row.Label = a.Label; row.Color = a.Color; row.Order = a.Order;
+            row.PhaseSplitSec = a.PhaseSplitSec; row.Phase1 = a.Phase1; row.Phase2 = a.Phase2;
             if (row.CreateMs != a.CreateMs || row.StartTick != a.StartTick || row.DurationMs != a.DurMs)
             {
                 row.CreateMs = a.CreateMs; row.StartTick = a.StartTick; row.DurationMs = a.DurMs;
@@ -144,6 +148,7 @@ internal sealed partial class MechanicCalloutTracker
         foreach (var t in a.Targets)
         {
             string name = NameFor(t.Uuid);
+            if (a.Counts != null && a.Counts.TryGetValue(t.Uuid, out int k) && k > 1) name += $" ×{k}";
             if (t.Safe >= 0) name += t.Safe == 1 ? $" <color=#22C55E>{McText.L("rm.mech.safe")}</color>"
                                                  : $" <color=#EF4444>{McText.L("rm.mech.out")}</color>";
             bool isLocal = localUuid != 0 && (t.Uuid == localUuid || (t.Uuid >> 16) == (localUuid >> 16));

@@ -351,6 +351,8 @@ internal sealed partial class MechanicMinimapPainter : IDisposable
         int n = pts.Length / 2;
         if (_poly.Length < 2 * n) _poly = new float[2 * n];
         for (int i = 0; i < n; i++) (_poly[2 * i], _poly[2 * i + 1]) = P(pts[2 * i], pts[2 * i + 1]);
+        // Style 3 = danger corridor (Golem Line, approved prototype B): translucent red fill only, like the danger tiles.
+        if (reg.Style == 3) { _r.FillPolygon(_poly, n, MechanicCalloutData.SlotColor(3), 0.35f); return; }
         FillStroke(n, c, 0.24f, 0.92f);
     }
 

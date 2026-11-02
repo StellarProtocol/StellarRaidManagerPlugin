@@ -51,6 +51,7 @@ internal struct MinimapRegion
                                        // Crystal: 1 = pressed but still present (dimmed glyph)
                                        // Text:    0 = plain white, 1 = dimmed (not the current Purge step), 2 = CURRENT Purge step (bright, larger)
                                        // Ring:    3 = raid ring DANGER band (red fill + heavy edges), 1 = SAFE band (calm outline only)
+                                       // Polygon: 3 = DANGER corridor (red fill 0.35, no outline; raid Golem Line)
 
     public static MinimapRegion Ring(float rInner, float rOuter, int color) =>
         new() { Kind = MinimapRegionKind.Ring, RInner = rInner, ROuter = rOuter, Color = color };

@@ -21,6 +21,15 @@ internal sealed class McRow
     public long   Arrival;                       // arrival sequence (Order.cs) — set once when the row first appears
     public float  SnapRemain = -1f;              // seconds at SnapTick; -1 = no timer
     public string LocalName = "", OtherNames = "";
+    // Two-phase countdown (raid Golem Line "Locks N.Ns" → "Dash N.Ns"): the timer runs to the SECOND event; the first
+    // phase ends PhaseSplitSec before it. -1 = a plain countdown. Phase1/Phase2 = catalog FORMAT keys ("{0}" = seconds),
+    // resolved at display time so a live language switch applies.
+    public float  PhaseSplitSec = -1f;
+    public string Phase1 = "", Phase2 = "";
+    public bool  IsPhased     => PhaseSplitSec > 0f && HasTimer;
+    public bool  InFirstPhase => IsPhased && ShownRemainSec > PhaseSplitSec;
+    public float PhaseRemainSec => InFirstPhase ? ShownRemainSec - PhaseSplitSec : ShownRemainSec;
+    public string PhaseText   => McText.F(InFirstPhase ? Phase1 : Phase2, $"{PhaseRemainSec:0.0}");
 
     public bool  HasTimer  => DurationMs > 0;
     public float RemainSec => DurationMs <= 0 ? -1f
@@ -142,7 +151,7 @@ internal sealed partial class MechanicCalloutTracker : IDisposable
     {
         _names.Clear(); _rows.Clear(); _ents.Clear(); _buffs.Clear(); _firstSeen.Clear();
         ResetMonsterIds(); _mkSlotByKey.Clear(); _casts.Clear(); _castState.Clear(); _entColor.Clear(); _mapValid = false;
-        ResetWide(); ResetOccurrences(); ResetPinballProbe(); ResetPinballBalls(); ResetExpiry(); ResetRing(); ResetFloor(); ResetCrystals();
+        ResetWide(); ResetOccurrences(); ResetPinballProbe(); ResetPinballBalls(); ResetExpiry(); ResetRing(); ResetFloor(); ResetCrystals(); ResetGolemLine();
         _raidArena = RaidArena.Kind.Unknown; ClearLocalDanger();
         McBuffEffectPatch.Clear();          // buff uuids are recycled across scenes (Buff-Tracking.md §8)
     }

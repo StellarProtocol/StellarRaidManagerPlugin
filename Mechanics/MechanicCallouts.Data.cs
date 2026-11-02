@@ -228,6 +228,8 @@ internal static class MechanicCalloutData
                     829327, 829328, 829329, 829330, 829331, 829332, 829372, 829373, 829374,
                     // P3 floor Decay 连结试炼 (row)
                     829325,
+                    // P2 golem red-carpet target (fire = golem 103203; no table row — rule, Rules.GolemLine.cs)
+                    829262,
                     // boss "release" buffs = Share / Decay / Spread hit moment (no rows; Release.cs shows "NOW")
                     829310, 829311, 829312,
                     // NOT yet used (raid logs, data note only): 829238 death teleport to a living teammate (player) ·
