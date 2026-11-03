@@ -103,7 +103,7 @@ public sealed partial class Plugin
 
     private bool AnyBanner()
     {
-        if (DangerBanner() != null || RingBanner() != null) return true;
+        if (DangerBanner() != null || RingBanner() != null || SpinBanner() != null) return true;
         foreach (var b in _banners) if (BannerLive(b)) return true;
         return false;
     }
@@ -115,6 +115,8 @@ public sealed partial class Plugin
         if (d != null) { if (i == 0) return d; i--; }
         var r = RingBanner();                                   // ring MOVE banner next (Plugin.MechanicAlerts.Ring.cs)
         if (r != null) { if (i == 0) return r; i--; }
+        var sp = SpinBanner();                                  // Spin Fan MOVE banner next (Plugin.MechanicAlerts.Spin.cs)
+        if (sp != null) { if (i == 0) return sp; i--; }
         int k = 0;
         foreach (var b in _banners)
             if (BannerLive(b) && k++ == i) return b;
@@ -161,6 +163,8 @@ public sealed partial class Plugin
     private string DetailLine(Banner b)
     {
         if (b == SampleBanner) return McText.T("Left Charge") + "  8.0s";
+        // Two-phase countdown (Golem Line): the phase text IS the detail line ("Locks 3.1s" / "Dash 1.8s").
+        if (b.Occ.Row.IsPhased) return b.Occ.Row.PhaseText;
         string t = !b.Occ.Row.HasTimer ? "" : b.Occ.Row.IsHitNow ? _loc.T("rm.mech.now")   // release buff marked the hit
             : $"{b.Occ.Row.ShownRemainSec:0.0}s";                                      // hit-offset adjusted
         return b.Detail.Length == 0 ? t : t.Length == 0 ? b.Detail : $"{b.Detail}   {t}";

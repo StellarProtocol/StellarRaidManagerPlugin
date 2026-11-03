@@ -42,12 +42,13 @@ public sealed partial class Plugin
     // name line get it, and not the last visible line (the backdrop hugs the column, so a trailing gap would be blank).
     private const float MechHudNameGap = 6f;
     // The mechanic label FILLS the row up to the timer (its cell is the row's one Weight cell) and the timer is pinned to
-    // the inner right edge, so a wider window gives the label the room. Timer 72 (was 48): sized for the widest
-    // localized "now" ("SEKARANG" ≈ 65 px est. at 14 px) as well as "88.8s", so the label edge never shifts.
-    private const float MechHudTimerW = 72f, MechHudSwatchCell = 14f, MechHudSwatch = 10f, MechHudBreak = 4f, MechHudGap = 6f;
-    // Fixed row columns besides the label: swatch cell + gap + [label] + gap + break + gap + timer = 108.
+    // the inner right edge, so a wider window gives the label the room. Timer 80 (was 48, then 72): sized for the widest
+    // localized "now" ("SEKARANG" ≈ 65 px est. at 14 px), "88.8s" and the Golem Line phase countdown ("Kunci 3.1s" /
+    // "Locks 3.1s" ≈ 70 px est.), so the label edge never shifts.
+    private const float MechHudTimerW = 80f, MechHudSwatchCell = 14f, MechHudSwatch = 10f, MechHudBreak = 4f, MechHudGap = 6f;
+    // Fixed row columns besides the label: swatch cell + gap + [label] + gap + break + gap + timer = 116.
     private const float MechHudRowFixedW = MechHudSwatchCell + MechHudGap + MechHudGap + MechHudBreak + MechHudGap + MechHudTimerW;
-    // MinW 460 (was 550 with a fixed 300 label column): 460 − 2·20 pad − 108 = 312 label px ≥ the old 300, so nothing
+    // MinW 460 (was 550 with a fixed 300 label column): 460 − 2·20 pad − 116 = 304 label px ≥ the old 300, so nothing
     // that fit before truncates sooner at the minimum width (the name line just wraps a little earlier).
     private const float MechHudMinW = 460f, MechHudMaxW = 1200f;
     // Target-name line indent: swatch cell + row gap puts it under the label's first glyph, +12 (~2 spaces at 14 px) so
@@ -266,6 +267,7 @@ public sealed partial class Plugin
         var row = MechLineAt(i)?.Row;
         if (row == null || !row.HasTimer) return "";
         if (row.IsHitNow) return _loc.T("rm.mech.now");   // boss release buff just marked the hit (tracker Release.cs)
+        if (row.IsPhased) return row.PhaseText;   // two-phase countdown: "Locks 3.1s" → "Dash 1.8s" (Golem Line, localized)
         float r = row.ShownRemainSec;   // hit-offset adjusted (0 = the mechanic lands now)
         return r < 10f ? $"{r:0.0}s" : $"{(int)r}s";
     }

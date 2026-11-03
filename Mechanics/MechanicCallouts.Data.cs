@@ -228,6 +228,12 @@ internal static class MechanicCalloutData
                     829327, 829328, 829329, 829330, 829331, 829332, 829372, 829373, 829374,
                     // P3 floor Decay 连结试炼 (row)
                     829325,
+                    // P2 golem red-carpet target (fire = golem 103203; no table row — rule, Rules.AimLine.cs)
+                    829262,
+                    // Cannon Laser target (fire = corner cannon 103110/103111; rule, Rules.AimLine.cs)
+                    829136,
+                    // Spin Fan wave start on the centre caster 10310066: 829134 yaw+ / 829135 yaw- (rule, Rules.SpinFan.cs)
+                    829134, 829135,
                     // boss "release" buffs = Share / Decay / Spread hit moment (no rows; Release.cs shows "NOW")
                     829310, 829311, 829312,
                     // NOT yet used (raid logs, data note only): 829238 death teleport to a living teammate (player) ·
@@ -241,7 +247,7 @@ internal static class MechanicCalloutData
             //   103304-103306 (Zone A markers) — in-game confirmed: Phase / Phase-Mapping buffs ride monsters like these.
             new[] { 103100, 103107, 103108, 103106, 103207, 103208, 103308, 103200, 103300, 103301, 103302, 103303, 103309,
                     103201, 103202, 103203, 103204, 103304, 103305, 103306,
-                    103310, 103311, 10310062, 10310063, 10310064, 3543, 10330051 },
+                    103310, 103311, 10310062, 10310063, 10310064, 3543, 10330051, 10310066, 103110, 103111 },
             new[] { 103100, 103107, 103108, 103200, 103207, 103208, 103300, 103301, 103302, 103308, 103309, 103310, 103311 });
         Add("Towering Ruin", SceneKind.GiantTower, new[] { 1150, 1151, 1152 }, GiantTower,
             new[] { 821076 }, new[] { 2106, 2107, 1150, 1151, 1152 }, new[] { 1150, 1151, 1152 });

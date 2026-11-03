@@ -102,11 +102,16 @@ internal sealed partial class MechanicCalloutTracker
             }
             _map.Regions.AddRange(_raidPresetRegions);
             AddCrystalRegions();                                        // crystals + pressed tiles, on top of 1F/2F/3F (Crystals.cs)
+            AddAimLineRegions(_golemLine);                              // P2 golem red-carpet corridors (Rules.AimLine.cs)
         }
         if (_raidArena == RaidArena.Kind.Ring && _arenaConfident) AddRingBand();   // latest ring band (Rules.Ring.cs)
+        if (_raidArena == RaidArena.Kind.Ring && _arenaConfident) AddSpinFanRegions();   // Spin Fan wedges (Rules.SpinFan.cs)
+        if (_raidArena == RaidArena.Kind.Ring && _arenaConfident) AddAimLineRegions(_cannonLaser);   // corner-cannon laser corridors (Rules.AimLine.cs)
         // Raid renders unlocalized; dot floor = the local player's (SameFloor). Pinball ball = slot 5, only while ARMED
-        // (Rules.Pinball.cs) — an idle pooled ball has no colour and so no dot.
-        AddDots(e => SameFloor(e.Pos.y), e => e.MonsterId == PinballBallId && BallArmed(e.Uuid) ? 5 : -1);
+        // (Rules.Pinball.cs) — an idle pooled ball has no colour and so no dot. An aiming caster with a marker (golem) =
+        // red 3 (it is not a boss, so it would otherwise not draw at the corridor's origin); cannons never draw (AddDots).
+        AddDots(e => SameFloor(e.Pos.y), e => e.MonsterId == PinballBallId && BallArmed(e.Uuid) ? 5
+                                            : AimCasterSlot(e));
     }
 
     private void ClearMap() { _map.Clear(); _mapDotGo.Clear(); }
@@ -142,6 +147,7 @@ internal sealed partial class MechanicCalloutTracker
             }
             else
             {
+                if (AimCasterHidden(e.MonsterId)) continue;   // raid corner cannons: hidden in game → never a dot (Rules.AimLine.cs)
                 int ms = monsterSlot?.Invoke(e) ?? -1;
                 if (ms >= 0) slot = ms;
                 if (slot < 0 && !_scene!.Bosses.Contains(e.MonsterId)) continue;
