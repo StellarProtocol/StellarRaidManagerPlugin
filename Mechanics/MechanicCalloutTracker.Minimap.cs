@@ -105,8 +105,10 @@ internal sealed partial class MechanicCalloutTracker
             AddAimLineRegions(_golemLine);                              // P2 golem red-carpet corridors (Rules.AimLine.cs)
         }
         if (_raidArena == RaidArena.Kind.Ring && _arenaConfident) AddRingBand();   // latest ring band (Rules.Ring.cs)
-        if (_raidArena == RaidArena.Kind.Ring && _arenaConfident) AddSpinFanRegions();   // Spin Fan wedges (Rules.SpinFan.cs)
-        if (_raidArena == RaidArena.Kind.Ring && _arenaConfident) AddAimLineRegions(_cannonLaser);   // corner-cannon laser corridors (Rules.AimLine.cs)
+        // Spin Fan + Cannon Laser draw whenever their own wave is live (that IS the ring evidence) — NOT gated on a
+        // confident arena: the ring verdict often stays "via Y" (low confidence) for this phase (11-03 run: nothing drew).
+        AddSpinFanRegions();                                                             // Spin Fan wedges (Rules.SpinFan.cs)
+        AddAimLineRegions(_cannonLaser);                                                 // corner-cannon laser corridors (Rules.AimLine.cs)
         // Raid renders unlocalized; dot floor = the local player's (SameFloor). Pinball ball = slot 5, only while ARMED
         // (Rules.Pinball.cs) — an idle pooled ball has no colour and so no dot. An aiming caster with a marker (golem) =
         // red 3 (it is not a boss, so it would otherwise not draw at the corridor's origin); cannons never draw (AddDots).
