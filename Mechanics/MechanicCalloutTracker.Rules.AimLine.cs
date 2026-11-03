@@ -21,18 +21,18 @@ namespace Stellar.RaidManager;
 internal sealed partial class MechanicCalloutTracker
 {
     private const int GolemId = 103203;
-    // Manual estimates (no auto-learning; tuned from the Experiment copy's lock/fire logs, then baked here).
-    // Golem Line — ONE recorded wave (recorder 2026-11-02, scene 13023):
-    internal const float GolemLineLockSec = 4.2f;   // T0 → golem facing locks (carpet stops moving)
-    internal const float GolemLineDashSec = 6.2f;   // T0 → golem dashes (≈ ground warning 6.41 s, warn ~0.2 s before buff)
-    // Corridor width (world m). ESTIMATE: no width in the 3.7 tables (SkillTable 10320029 / SkillEffectTable 1032002901
-    // EffectRange all 0; the warn shape lives in skill assets) — 5 m ≈ the approved prototype's corridor. Manual constant.
-    private const float GolemLineWidthM = 5f;
-    // Cannon Laser — two recorded waves (recorder 2026-11-02 20:01, scene 13023): lock ~T0+3.9–4.0 s; the laser fires at
-    // ~warn+6.0 s ≈ T0+5.85 s (inferred from the telegraph — no cast/bullet event marks the shot).
-    internal const float CannonLaserLockSec = 4.0f;
+    // Manual constants (no auto-learning), measured in game 2026-11-03 via the Experiment copy's diagnostics and
+    // user-approved. Warn boxes render at 0.7 × the timeline showScale.
+    // Golem Line (5 waves × 2 golems, scene 13023):
+    internal const float GolemLineLockSec = 4.0f;   // T0 → facing locks (last turn ≤ T0+3.93 s)
+    internal const float GolemLineDashSec = 6.4f;   // T0 → dash (still in place +6.33–6.41 s, moved by +6.85 s; warn dur 6.41 s)
+    // Corridor width (world m): fx p_fx_yujingline_juxing lossyScale (9.8, 3.5, 70) = 0.7 × showScale (14,5,100).
+    private const float GolemLineWidthM = 9.8f;
+    // Cannon Laser: lock = last turn +4.01–4.14 s. Fire ≈ warn+6.0 s ≈ T0+5.85 s is still inferred from the telegraph
+    // (no cast/bullet event marks the shot; not observed 11-03).
+    internal const float CannonLaserLockSec = 4.2f;
     internal const float CannonLaserFireSec = 5.85f;
-    private const float CannonLaserWidthM = 6f;     // user-chosen (2026-11-02); no width in the tables either
+    private const float CannonLaserWidthM = 10.5f;  // fx p_fx_yujing_juxing_1 lossyScale x 10.5 = 0.7 × showScale 15
     // Corridor edges (half-extents around world 0,0): raid grid floor lines ±30 × ±22.5 (RaidArena.Layout); the 150-band
     // arena's cannons stand at x −27.47/32.53, z −27.5/32.5 → a ±33 square encloses them (the corridor runs to its far side).
     private const float GridEdgeX = 30f, GridEdgeZ = 22.5f, CannonEdge = 33f;
