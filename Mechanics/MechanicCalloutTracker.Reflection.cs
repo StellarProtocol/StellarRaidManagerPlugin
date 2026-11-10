@@ -6,9 +6,9 @@ using Stellar.Abstractions.Services;
 namespace Stellar.RaidManager;
 
 // Reflection side of MechanicCalloutTracker: scene id, AOI entity enumeration, entity → BuffComp → buff list, BuffItem
-// fields and the AttrName read. Everything is resolved once and guarded; IL2CPP fields surface as PROPERTIES, so all
+// fields. Everything is resolved once and guarded; IL2CPP fields surface as PROPERTIES, so all
 // member lookups go through GetProperties()/GetProperty (never FieldInfo for IL2CPP types). Mirrors the proven paths in
-// Experiment FollowController (entity dict walk / GetEntity / GetAttr<T>) and TargetLens TargetBuffTracker (buff lists).
+// Experiment FollowController (entity dict walk / GetEntity / GetAttr<long>) and TargetLens TargetBuffTracker (buff lists).
 internal sealed partial class MechanicCalloutTracker
 {
     // ── Scene id ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -49,9 +49,9 @@ internal sealed partial class MechanicCalloutTracker
     private PropertyInfo? _piEntityDict;       // ZEntityMgr.entityDict_
     private MethodInfo?   _miGetEntity;        // ZEntityMgr.GetEntity(long)
     private PropertyInfo? _piBuffComp;         // ZEntity.BuffComp
-    private MethodInfo?   _miGetAttrObject;    // ZEntity.GetAttr<object>(EAttrType, bool) — AttrName read
-    private object?       _boxAttrName;        // boxed EAttrType.AttrName (= 1)
-    private MethodInfo?   _miGetAttrLong;      // ZEntity.GetAttr<long>(EAttrType, bool) — AttrId / AttrDir / AttrSkillId
+    // No GetAttr<object>: System.Object has no IL2CPP class pointer, so that instantiation always throws (and once
+    // crashed the game through a native stub). Names come from the ladder in NameFor.
+    private MethodInfo?   _miGetAttrLong;     // ZEntity.GetAttr<long>(EAttrType, bool) — AttrId / AttrDir / AttrSkillId
     private object?       _boxAttrId, _boxAttrDir, _boxAttrSkillId;   // EAttrType 10 / 50 / 100
     private object?       _boxAttrHp, _boxAttrMaxHp;                  // EAttrType 11310 / 11320 (dead check)
     private PropertyInfo? _piModel, _piModelGoComp, _piPosition;       // ZEntity.Model.ModelGoComp.Position (FollowController)
@@ -86,15 +86,10 @@ internal sealed partial class MechanicCalloutTracker
                     if (m.Name != "GetAttr" || !m.IsGenericMethodDefinition) continue;
                     var ps = m.GetParameters();
                     if (ps.Length == 2 && ps[0].ParameterType == attrEnum && ps[1].ParameterType == typeof(bool))
-                    {
-                        _miGetAttrObject = m.MakeGenericMethod(typeof(object));
-                        _miGetAttrLong   = m.MakeGenericMethod(typeof(long));   // same instantiation FollowController uses
-                        break;
-                    }
+                    { _miGetAttrLong = m.MakeGenericMethod(typeof(long)); break; }   // same instantiation FollowController uses
                 }
                 try
                 {
-                    _boxAttrName    = Enum.ToObject(attrEnum, 1);
                     _boxAttrId      = Enum.ToObject(attrEnum, 10);    // monster config id (upstream ATTR_ID 0x0a)
                     _boxAttrDir     = Enum.ToObject(attrEnum, 50);    // facing in centidegrees (upstream ATTR_FACING 0x32)
                     _boxAttrSkillId = Enum.ToObject(attrEnum, 100);   // current skill id (upstream cast signal)
@@ -313,17 +308,5 @@ internal sealed partial class MechanicCalloutTracker
     {
         if (pi == null) return 0;
         try { return TryNum(pi, o, out long v) ? v : Convert.ToInt64(pi.GetValue(o) ?? 0L); } catch { return 0; }
-    }
-
-    // AttrName (EAttrType 1) off the live entity via GetAttr<object> — GetAttr<T> has no string instantiation
-    // (Threat-Aggro-Tracking.md technique (a)). The native get_Value fallback (technique (b)) is not ported; the
-    // PartyRoster/CombatLookup/self rungs of the ladder cover a miss.
-    private string ReadAttrName(long uuid)
-    {
-        if (_miGetAttrObject == null || _boxAttrName == null) return "";
-        var ent = GetEntity(uuid);
-        if (ent == null) return "";
-        try { return _miGetAttrObject.Invoke(ent, new object[] { _boxAttrName, true })?.ToString() ?? ""; }
-        catch { return ""; }
     }
 }

@@ -146,10 +146,8 @@ internal sealed partial class MechanicCalloutTracker
     }
 
     // ── GetAttr<long> per attr ───────────────────────────────────────────────────────────────────────────────
-    // Proven = this attr has read non-zero through GetAttr<long> at least once, so the instantiation reads it cleanly
-    // and a later 0 is a real 0 — no GetAttr<object> + ToString + parse fallback (which allocated on every dead-HP /
-    // facing-0 read). Until proven, the fallback runs exactly as before.
-    private sealed class AttrSlot { public Func<object, long>? Fn; public bool Proven; }
+    // One bound delegate per boxed attr key (null Fn → the caller falls back to MethodInfo.Invoke).
+    private sealed class AttrSlot { public Func<object, long>? Fn; }
     private readonly Dictionary<object, AttrSlot> _attrSlots = new();
 
     private AttrSlot AttrSlotFor(object box)

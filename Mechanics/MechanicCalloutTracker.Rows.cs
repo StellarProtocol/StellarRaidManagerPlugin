@@ -256,13 +256,13 @@ internal sealed partial class MechanicCalloutTracker
     }
 
     // ── Names ────────────────────────────────────────────────────────────────────────────────────────────────
-    // Threat-Aggro-Tracking.md ladder: AttrName off the live entity → PartyRoster (roleId) → CombatLookup → self →
-    // "Player <roleId>". Only real names are cached, so a fallback retries on the next poll.
+    // Threat-Aggro-Tracking.md ladder minus the AttrName rung (its GetAttr<object> read can never work — see
+    // Reflection.cs): PartyRoster (roleId) → CombatLookup → self → "Player <roleId>". Only real names are cached, so a
+    // fallback retries on the next poll.
     private string NameFor(long uuid)
     {
         if (_names.TryGetValue(uuid, out var cached)) return cached;
-        string n = ReadAttrName(uuid);
-        if (n.Length == 0) n = PartyName(uuid >> 16);
+        string n = PartyName(uuid >> 16);
         if (n.Length == 0)
         {
             try { n = _services.CombatLookup.GetEntityName(new EntityId(uuid)) ?? ""; } catch { n = ""; }

@@ -117,33 +117,19 @@ internal sealed partial class MechanicCalloutTracker
         ReadLong(_piItemCreate, item), ReadLong(_piItemDuration, item), ReadLong(_piItemFire, item));
 
     // ── Live attribute / position reads ──────────────────────────────────────────────────────────────────────
-    // Numeric attr read. AttrId/AttrDir/AttrSkillId are int32 on the wire; whether the GetAttr<long> instantiation
-    // reads an int attr cleanly is UNVERIFIED (FollowController only proves it for HP), so a throw/0 falls back to
-    // GetAttr<object> + Convert (the boxed value of whatever the attr stores). The GetAttr<long> call goes through a
-    // typed per-attr delegate when it could be bound, and once an attr has read non-zero a later 0 is taken as real
-    // (FastReflection.cs AttrSlot) — the fallback allocated on every dead-HP / facing-0 read.
+    // Numeric attr read via GetAttr<long> — through a typed per-attr delegate when it could be bound (FastReflection.cs
+    // AttrSlot), else MethodInfo.Invoke. There is no fallback: the old GetAttr<object> rung could never work (System.Object
+    // has no IL2CPP class pointer → it always threw), so a throw/miss reads 0.
     private bool _attrLongFailed;
     private long ReadAttrLong(object ent, object? box)
     {
-        if (box == null) return 0;
-        if (_miGetAttrLong != null && !_attrLongFailed)
-        {
-            try
-            {
-                var slot = AttrSlotFor(box);
-                long v = slot.Fn != null ? slot.Fn(ent) : Convert.ToInt64(_miGetAttrLong.Invoke(ent, new object[] { box, true }) ?? 0L);
-                if (v != 0) { slot.Proven = true; return v; }
-                if (slot.Proven) return 0;
-            }
-            catch { _attrLongFailed = true; }   // → GetAttr<object> from now on
-        }
-        if (_miGetAttrObject == null) return 0;
+        if (box == null || _miGetAttrLong == null || _attrLongFailed) return 0;
         try
         {
-            var o = _miGetAttrObject.Invoke(ent, new object[] { box, true });
-            return o == null ? 0 : long.TryParse(o.ToString(), out long v) ? v : 0;
+            var slot = AttrSlotFor(box);
+            return slot.Fn != null ? slot.Fn(ent) : Convert.ToInt64(_miGetAttrLong.Invoke(ent, new object[] { box, true }) ?? 0L);
         }
-        catch { return 0; }
+        catch { _attrLongFailed = true; return 0; }   // attr reads are 0 from now on
     }
 
     // AttrDir is yaw in centidegrees (upstream: `value / 100`). 0 is taken at face value (a wave facing exactly 0° is
