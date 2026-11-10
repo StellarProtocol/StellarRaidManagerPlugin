@@ -164,16 +164,30 @@ internal sealed partial class MechanicCalloutTracker
         if (c.TileUuid != 0 && c.TileObj != null)
         {
             var buffs = TileBuffs(c.TileObj);
-            int crackLayer = buffs.Where(b => b.Id == 829209).Select(b => b.Layer).DefaultIfEmpty(0).Max();
+            int crackLayer = MaxLayer(buffs, 829209);
             if (crackLayer >= 2) return FloorState.Destroyed;
-            if (buffs.Any(b => b.Id == 829239 || b.Id == 829204)) return FloorState.Destroyed;
-            if (crackLayer == 1 || buffs.Any(b => b.Id == 829208)) return FloorState.Cracked;
+            if (HasTileBuff(buffs, 829239) || HasTileBuff(buffs, 829204)) return FloorState.Destroyed;
+            if (crackLayer == 1 || HasTileBuff(buffs, 829208)) return FloorState.Cracked;
             c.DummyDestroyed = false;                                 // a present tile beats an earlier removal event
             if (c.TileBase == 3532 || c.DummyCracked) return FloorState.Cracked;
             return FloorState.Intact;
         }
         if (c.DummyDestroyed || c.HadTile) return FloorState.Destroyed;   // removal dummy (spawn) / tile gone
         return FloorState.Unknown;
+    }
+
+    // Evaluate runs for all 9 cells on every scan: plain loops instead of the LINQ chains (iterator garbage each time).
+    private static int MaxLayer(List<(int Id, int Layer)> buffs, int id)
+    {
+        int m = 0;
+        foreach (var b in buffs) if (b.Id == id && b.Layer > m) m = b.Layer;
+        return m;
+    }
+
+    private static bool HasTileBuff(List<(int Id, int Layer)> buffs, int id)
+    {
+        foreach (var b in buffs) if (b.Id == id) return true;
+        return false;
     }
 
     private readonly List<(int Id, int Layer)> _tileBuffScratch = new();
