@@ -88,7 +88,7 @@ internal sealed partial class MechanicCalloutTracker
         {
             try
             {
-                var comp = _miGetSkillComp.Invoke(ent, null);
+                var comp = _getSkillCompFn != null ? _getSkillCompFn(ent) : _miGetSkillComp.Invoke(ent, null);
                 if (comp != null)
                 {
                     if (_piCurSkillId == null)
@@ -121,6 +121,7 @@ internal sealed partial class MechanicCalloutTracker
                     if (mi.Name == "GetComponent" && mi.IsGenericMethodDefinition && mi.GetParameters().Length == 0)
                     { gen = mi; break; }
             if (skComp != null && gen != null) _miGetSkillComp = gen.MakeGenericMethod(skComp);
+            _getSkillCompFn = Bind0<object?>(_miGetSkillComp);   // typed call, no Invoke (FastReflection.cs)
         }
         catch { }
     }

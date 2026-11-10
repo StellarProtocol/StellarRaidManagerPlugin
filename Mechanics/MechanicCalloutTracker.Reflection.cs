@@ -154,8 +154,9 @@ internal sealed partial class MechanicCalloutTracker
     {
         try
         {
-            var mgr = _piEntMgrInstance!.GetValue(null);
-            return mgr == null ? null : _miGetEntity!.Invoke(mgr, new object[] { uuid });
+            var mgr = EntMgr();   // once per poll (FastReflection.cs)
+            if (mgr == null) return null;
+            return _getEntityFn != null ? _getEntityFn(mgr, uuid) : _miGetEntity!.Invoke(mgr, new object[] { uuid });
         }
         catch { return null; }
     }
@@ -169,22 +170,35 @@ internal sealed partial class MechanicCalloutTracker
         bool sawLocal = false;
         try
         {
-            var mgr  = _piEntMgrInstance!.GetValue(null);
-            var dict = mgr != null ? _piEntityDict!.GetValue(mgr) : null;
-            var keys = dict?.GetType().GetProperty("Keys")?.GetValue(dict);
-            if (keys != null)
-                foreach (var k in WalkIl2Cpp(keys))
-                {
-                    long uuid = Convert.ToInt64(k);
-                    long type = (uuid >> 6) & 31;
-                    if (!allTypes && type != EntChar && !(withMonsters && (type == EntMonster || type == EntDummy))) continue;
-                    if (uuid == localUuid) sawLocal = true;
-                    _uuidScratch.Add(uuid);
-                }
+            var mgr  = EntMgr();
+            var dict = mgr != null ? GetRef(_piEntityDict!, mgr) : null;
+            if (dict != null && !_walkResolved) ResolveKeyWalk(dict);
+            if (dict != null && _enumCurFn != null)
+            {
+                // Typed walk (FastReflection.cs): no boxed key / MoveNext result, no per-scan List<object>.
+                var keys = _dictKeysFn!(dict);
+                var en   = keys != null ? _keysEnumFn!(keys) : null;
+                if (en != null)
+                    while (_enumMoveFn!(en)) AddUuid(_enumCurFn(en), localUuid, withMonsters, allTypes, ref sawLocal);
+            }
+            else
+            {
+                var keys = dict != null ? _piDictKeys?.GetValue(dict) : null;
+                if (keys != null)
+                    foreach (var k in WalkIl2Cpp(keys)) AddUuid(Convert.ToInt64(k), localUuid, withMonsters, allTypes, ref sawLocal);
+            }
         }
         catch (Exception ex) { LogErrOnce("entity walk: " + (ex.InnerException?.Message ?? ex.Message)); }
         if (!sawLocal && localUuid != 0) _uuidScratch.Add(localUuid);
         return _uuidScratch;
+    }
+
+    private void AddUuid(long uuid, long localUuid, bool withMonsters, bool allTypes, ref bool sawLocal)
+    {
+        long type = (uuid >> 6) & 31;
+        if (!allTypes && type != EntChar && !(withMonsters && (type == EntMonster || type == EntDummy))) return;
+        if (uuid == localUuid) sawLocal = true;
+        _uuidScratch.Add(uuid);
     }
 
     // Il2Cpp enumerable walk via GetEnumerator/MoveNext/Current (Dictionary.KeyCollection isn't IEnumerable to us).
@@ -243,14 +257,25 @@ internal sealed partial class MechanicCalloutTracker
         return p;
     }
 
+    // Typed Count / indexer when bound (FastReflection.cs ListFast), else the PropertyInfo read as before.
     private int ListCount(object list)
     {
-        try { return Convert.ToInt32(ListProps(list).Count?.GetValue(list) ?? 0); } catch { return 0; }
+        try
+        {
+            var f = ListFast(list).Count;
+            return f != null ? f(list) : Convert.ToInt32(ListProps(list).Count?.GetValue(list) ?? 0);
+        }
+        catch { return 0; }
     }
 
     private object? ListItem(object list, int i)
     {
-        try { return ListProps(list).Item?.GetValue(list, new object[] { i }); } catch { return null; }
+        try
+        {
+            var f = ListFast(list).Item;
+            return f != null ? f(list, i) : ListProps(list).Item?.GetValue(list, new object[] { i });
+        }
+        catch { return null; }
     }
 
     private bool          _itemResolved;
@@ -272,15 +297,22 @@ internal sealed partial class MechanicCalloutTracker
         if (_piItemBaseId == null) _services.Log.Warning("[MechCallout] BuffItem.BuffBaseId not found");
     }
 
+    // Typed int/long getter when bound (FastReflection.cs TryNum — no box), else GetValue + Convert. Out-of-range
+    // long → int reads 0, as Convert.ToInt32's OverflowException did.
     private static int ReadInt(PropertyInfo pi, object o)
     {
-        try { return Convert.ToInt32(pi.GetValue(o) ?? 0); } catch { return 0; }
+        try
+        {
+            if (TryNum(pi, o, out long v)) return v is >= int.MinValue and <= int.MaxValue ? (int)v : 0;
+            return Convert.ToInt32(pi.GetValue(o) ?? 0);
+        }
+        catch { return 0; }
     }
 
     private static long ReadLong(PropertyInfo? pi, object o)
     {
         if (pi == null) return 0;
-        try { return Convert.ToInt64(pi.GetValue(o) ?? 0L); } catch { return 0; }
+        try { return TryNum(pi, o, out long v) ? v : Convert.ToInt64(pi.GetValue(o) ?? 0L); } catch { return 0; }
     }
 
     // AttrName (EAttrType 1) off the live entity via GetAttr<object> — GetAttr<T> has no string instantiation

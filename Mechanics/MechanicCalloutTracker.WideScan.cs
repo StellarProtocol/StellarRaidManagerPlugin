@@ -49,12 +49,12 @@ internal sealed partial class MechanicCalloutTracker
             if (!_wideComp.TryGetValue(uuid, out var comp))
             {
                 obj ??= GetEntity(uuid);
-                comp = obj != null ? _piBuffComp?.GetValue(obj) : null;
+                comp = obj != null ? Ref(_piBuffComp, obj) : null;
                 _wideComp[uuid] = comp;
             }
             if (comp == null) return;
             if (!_listsResolved) ResolveLists(comp);
-            var list = _piFullList?.GetValue(comp);
+            var list = Ref(_piFullList, comp);
             if (list == null) return;
             int n = ListCount(list);
             for (int i = 0; i < n; i++)

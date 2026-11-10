@@ -169,6 +169,7 @@ internal sealed partial class MechanicCalloutTracker : IDisposable
     {
         McPerf.MaybeFlush(_services.Log.Info);   // [MechPerf] line every 10 s while framework diagnostics are on (McPerf.cs)
         var pm = McPerf.Begin();
+        _pollSeq++;                              // new poll → EntMgr() re-reads the singleton (FastReflection.cs)
         PollCore();
         McPerf.End(McPerf.Poll, pm);
     }
@@ -192,6 +193,7 @@ internal sealed partial class MechanicCalloutTracker : IDisposable
             }
             _scene = def;
             if (!EnsureApi()) { ClearOutput(); return; }
+            ResolveFastPaths();                 // once: typed delegates over the hot reflection reads
             EnsureEffectPatch();
             McBuffEffectPatch.Active = true;    // record PlayEffect ids only while in a supported scene
 

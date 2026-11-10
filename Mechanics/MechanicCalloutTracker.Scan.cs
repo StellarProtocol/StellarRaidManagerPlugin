@@ -91,10 +91,10 @@ internal sealed partial class MechanicCalloutTracker
     // Reads ONE entity's full server buff list into _buffs (scene mechanic ids only).
     private void ScanEntityBuffs(long uuid, object ent, SceneDef def)
     {
-        var comp = _piBuffComp?.GetValue(ent);
+        var comp = Ref(_piBuffComp, ent);
         if (comp == null) return;
         if (!_listsResolved) ResolveLists(comp);
-        var list = _piFullList?.GetValue(comp);
+        var list = Ref(_piFullList, comp);
         if (list == null) return;
 
         int n = ListCount(list);
@@ -119,7 +119,9 @@ internal sealed partial class MechanicCalloutTracker
     // ── Live attribute / position reads ──────────────────────────────────────────────────────────────────────
     // Numeric attr read. AttrId/AttrDir/AttrSkillId are int32 on the wire; whether the GetAttr<long> instantiation
     // reads an int attr cleanly is UNVERIFIED (FollowController only proves it for HP), so a throw/0 falls back to
-    // GetAttr<object> + Convert (the boxed value of whatever the attr stores).
+    // GetAttr<object> + Convert (the boxed value of whatever the attr stores). The GetAttr<long> call goes through a
+    // typed per-attr delegate when it could be bound, and once an attr has read non-zero a later 0 is taken as real
+    // (FastReflection.cs AttrSlot) — the fallback allocated on every dead-HP / facing-0 read.
     private bool _attrLongFailed;
     private long ReadAttrLong(object ent, object? box)
     {
@@ -128,8 +130,10 @@ internal sealed partial class MechanicCalloutTracker
         {
             try
             {
-                long v = Convert.ToInt64(_miGetAttrLong.Invoke(ent, new object[] { box, true }) ?? 0L);
-                if (v != 0) return v;
+                var slot = AttrSlotFor(box);
+                long v = slot.Fn != null ? slot.Fn(ent) : Convert.ToInt64(_miGetAttrLong.Invoke(ent, new object[] { box, true }) ?? 0L);
+                if (v != 0) { slot.Proven = true; return v; }
+                if (slot.Proven) return 0;
             }
             catch { _attrLongFailed = true; }   // → GetAttr<object> from now on
         }
@@ -153,8 +157,8 @@ internal sealed partial class MechanicCalloutTracker
         pos = default; goComp = null;
         try
         {
-            var model = _piModel?.GetValue(ent);
-            goComp = model != null ? _piModelGoComp?.GetValue(model) : null;
+            var model = Ref(_piModel, ent);
+            goComp = model != null ? Ref(_piModelGoComp, model) : null;
             return goComp != null && TryGoPos(goComp, out pos);
         }
         catch { return false; }
