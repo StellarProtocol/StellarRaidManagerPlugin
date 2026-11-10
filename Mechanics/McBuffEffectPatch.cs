@@ -1,8 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Reflection;
 using HarmonyLib;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Stellar.Abstractions.Services;
 
 namespace Stellar.RaidManager;
@@ -76,7 +78,8 @@ internal static class McBuffEffectPatch
     {
         if (target == null) { _log?.Invoke($"[MechCallout] {prefix}: target not found"); return; }
         try { h.Patch(target, prefix: new HarmonyMethod(typeof(McBuffEffectPatch), prefix)); }
-        catch (Exception ex) { _log?.Invoke($"[MechCallout] patch {target.Name} failed: {ex.Message}"); }
+        catch (Exception ex) { _log?.Invoke($"[MechCallout] patch {target.Name} failed: {ex.Message}"); return; }
+        foreach (var p in target.GetParameters()) Warm(p.ParameterType);   // bind the getters now, not mid-fight
     }
 
     // ── Hooks ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -86,7 +89,7 @@ internal static class McBuffEffectPatch
         var pm = McPerf.Begin();
         try
         {
-            long host = Long(Prop(__0, "HostUuid"));
+            long host = PLong(__0, "HostUuid");
             if (host == 0) host = HostUuid(__instance);
             ProcessBuffInfo(host, __0);
         }
@@ -101,10 +104,11 @@ internal static class McBuffEffectPatch
         try
         {
             long compHost = 0;
-            foreach (var eff in Items(__0))
+            for (int i = 0, n = Count(__0); i < n; i++)
             {
+                var eff = At(__0, i);
                 if (eff == null) continue;
-                long host = Long(Prop(eff, "HostUuid"));
+                long host = PLong(eff, "HostUuid");
                 if (host == 0) host = compHost != 0 ? compHost : (compHost = HostUuid(__instance));
                 ProcessEffect(host, eff);
             }
@@ -120,16 +124,16 @@ internal static class McBuffEffectPatch
         var pm = McPerf.Begin();
         try
         {
-            long entHost = __0 != null ? Long(Prop(__0, "Uuid")) : 0;
+            long entHost = __0 != null ? PLong(__0, "Uuid") : 0;
             if (__1 != null && Prop(__1, "BuffInfos") is { } infos)
-                foreach (var bi in Items(infos))
-                    if (bi != null) ProcessBuffInfo(HostOr(Long(Prop(bi, "HostUuid")), entHost), bi);
+                for (int i = 0, n = Count(infos); i < n; i++)
+                    if (At(infos, i) is { } bi) ProcessBuffInfo(HostOr(PLong(bi, "HostUuid"), entHost), bi);
             if (__2 != null)
             {
-                long syncHost = HostOr(Long(Prop(__2, "Uuid")), entHost);
+                long syncHost = HostOr(PLong(__2, "Uuid"), entHost);
                 if (Prop(__2, "BuffEffects") is { } effs)
-                    foreach (var eff in Items(effs))
-                        if (eff != null) ProcessEffect(HostOr(Long(Prop(eff, "HostUuid")), syncHost), eff);
+                    for (int i = 0, n = Count(effs); i < n; i++)
+                        if (At(effs, i) is { } eff) ProcessEffect(HostOr(PLong(eff, "HostUuid"), syncHost), eff);
             }
         }
         catch (Exception ex) { LogOnce("parseBuff", ex); }
@@ -141,7 +145,7 @@ internal static class McBuffEffectPatch
     // A BuffInfo (add / snapshot): its own LogicEffect PlayEffect ids (upstream observed_buff).
     private static void ProcessBuffInfo(long host, object info)
     {
-        int buff = Int(Prop(info, "BuffUuid"));
+        int buff = PInt(info, "BuffUuid");
         if (buff == 0 || host == 0) return;
         var ids = PlayEffectIds(Prop(info, "LogicEffect"), out _);
         if (ids.Count > 0) Store(host, buff, ids);
@@ -150,9 +154,9 @@ internal static class McBuffEffectPatch
     // A BuffEffect (sync): outer PlayEffect ids override on AddBuff/BuffChange; Customize replaces; Remove drops.
     private static void ProcessEffect(long host, object eff)
     {
-        int buff = Int(Prop(eff, "BuffUuid"));
+        int buff = PInt(eff, "BuffUuid");
         if (buff == 0 || host == 0) return;
-        int type  = Int(Prop(eff, "Type"));
+        int type  = PInt(eff, "Type");
         var logic = Prop(eff, "LogicEffect");
         var ids = PlayEffectIds(logic, out bool addOrChange);
         if (type == EventRemove) _ids.Remove((host >> 16, buff));
@@ -176,10 +180,11 @@ internal static class McBuffEffectPatch
         hasAddOrChange = false;
         var res = new List<int>();
         if (logicList == null) return res;
-        foreach (var li in Items(logicList))
+        for (int i = 0, n = Count(logicList); i < n; i++)
         {
+            var li = At(logicList, i);
             if (li == null) continue;
-            int et = Int(Prop(li, "EffectType"));
+            int et = PInt(li, "EffectType");
             if (et == LogicAddBuff || et == LogicBuffChange) hasAddOrChange = true;
             if (et != LogicPlayEffect) continue;
             var raw = Bytes(Prop(li, "RawData"));
@@ -194,9 +199,10 @@ internal static class McBuffEffectPatch
     {
         var res = new List<int>();
         if (logicList == null) return res;
-        foreach (var li in Items(logicList))
+        for (int i = 0, n = Count(logicList); i < n; i++)
         {
-            if (li == null || Int(Prop(li, "EffectType")) == LogicStopAll) continue;
+            var li = At(logicList, i);
+            if (li == null || PInt(li, "EffectType") == LogicStopAll) continue;
             var raw = Bytes(Prop(li, "RawData"));
             if (raw == null) continue;
             if (TryDecodeEffectId(raw, out int id) && id != 0) res.Add(id);
@@ -253,29 +259,127 @@ internal static class McBuffEffectPatch
     }
 
     // ── Reflection helpers (IL2CPP fields surface as properties; RepeatedField isn't IEnumerable to us) ─────
-    private static readonly Dictionary<(Type, string), PropertyInfo?> _props = new();
+    // These run inside the buff prefixes, which are hot in raids. PropertyInfo.GetValue / MethodInfo.Invoke allocate an
+    // object[] and box every value per call (Plugin-Performance-Rules.md §2), so each (type, member) is bound ONCE into a
+    // compiled delegate; integral/enum members get an unboxed long getter. If binding throws, the reflection call is
+    // kept as the fallback (same result, just slower). Install() pre-binds the known proto types so the Expression
+    // compiles happen on scene entry, not on the first buff mid-fight.
+    private sealed class Acc
+    {
+        public Func<object, object?>?      Obj;   // reference-typed property, or ByteString.ToByteArray()
+        public Func<object, long>?         Num;   // integral / enum property, widened to long, no box
+        public Func<object, int, object?>? Item;  // RepeatedField indexer
+    }
+    private const string ToBytes = "ToByteArray()", Indexer = "[]";
+    private const BindingFlags Inst = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+    private static readonly Dictionary<(Type, string), Acc?> _acc = new();
+
+    private static Acc? Get(Type t, string name)
+    {
+        if (!_acc.TryGetValue((t, name), out var a)) _acc[(t, name)] = a = Bind(t, name);
+        return a;
+    }
+
+    private static Acc? Bind(Type t, string name)
+    {
+        if (name == ToBytes)
+        {
+            var m = t.GetMethod("ToByteArray", Type.EmptyTypes);
+            if (m == null) return null;
+            try
+            {
+                var p = Expression.Parameter(typeof(object));
+                return new Acc { Obj = Expression.Lambda<Func<object, object?>>(
+                    Expression.Convert(Expression.Call(Expression.Convert(p, t), m), typeof(object)), p).Compile() };
+            }
+            catch { return new Acc { Obj = o => m.Invoke(o, null) }; }
+        }
+        if (name == Indexer)
+        {
+            var pi = t.GetProperty("Item");                     // same lookup the reflection path always used
+            if (pi == null) return null;
+            try
+            {
+                var p = Expression.Parameter(typeof(object)); var i = Expression.Parameter(typeof(int));
+                return new Acc { Item = Expression.Lambda<Func<object, int, object?>>(
+                    Expression.Convert(Expression.Property(Expression.Convert(p, t), pi, i), typeof(object)), p, i).Compile() };
+            }
+            catch { return new Acc { Item = (o, i) => pi.GetValue(o, new object[] { i }) }; }
+        }
+        var prop = t.GetProperty(name, Inst);
+        return prop == null ? null : BindProp(t, prop);
+    }
+
+    // Widening to long is exact for these types, so PInt/PLong return what Convert.ToInt32/64 on the boxed value did
+    // (ulong is excluded — it could wrap — and stays on the boxed path).
+    private static bool IsNum(Type pt)
+    {
+        if (pt.IsEnum) pt = Enum.GetUnderlyingType(pt);
+        return pt == typeof(int) || pt == typeof(long) || pt == typeof(uint) || pt == typeof(short)
+            || pt == typeof(ushort) || pt == typeof(byte) || pt == typeof(sbyte);
+    }
+
+    private static Acc BindProp(Type t, PropertyInfo pi)
+    {
+        try
+        {
+            var p = Expression.Parameter(typeof(object));
+            var get = Expression.Property(Expression.Convert(p, t), pi);
+            return IsNum(pi.PropertyType)
+                ? new Acc { Num = Expression.Lambda<Func<object, long>>(Expression.Convert(get, typeof(long)), p).Compile() }
+                : new Acc { Obj = Expression.Lambda<Func<object, object?>>(Expression.Convert(get, typeof(object)), p).Compile() };
+        }
+        catch { return new Acc { Obj = o => pi.GetValue(o) }; }
+    }
 
     private static object? Prop(object o, string name)
     {
-        var key = (o.GetType(), name);
-        if (!_props.TryGetValue(key, out var pi))
-            _props[key] = pi = o.GetType().GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-        return pi?.GetValue(o);
+        var a = Get(o.GetType(), name);
+        return a == null ? null : a.Obj != null ? a.Obj(o) : a.Num != null ? a.Num(o) : null;
+    }
+    private static int PInt(object o, string name)
+    {
+        var a = Get(o.GetType(), name);
+        if (a?.Num == null) return Int(a?.Obj?.Invoke(o));
+        long v = a.Num(o);
+        return v is >= int.MinValue and <= int.MaxValue ? (int)v : 0;   // Convert.ToInt32 overflow → caught → 0
+    }
+    private static long PLong(object o, string name)
+    {
+        var a = Get(o.GetType(), name);
+        return a?.Num != null ? a.Num(o) : Long(a?.Obj?.Invoke(o));
     }
 
-    private static IEnumerable<object?> Items(object list)
+    private static int     Count(object list)     => PInt(list, "Count");
+    private static object? At(object list, int i) => Get(list.GetType(), Indexer)?.Item?.Invoke(list, i);
+
+    // Pre-binds every member the hooks read, walking from the patched methods' parameter types into the nested proto
+    // types (LogicEffect / BuffInfos / BuffEffects lists → their element type → RawData ByteString).
+    private static readonly string[] _scalars = { "Count", "HostUuid", "BuffUuid", "BaseId", "Type", "Uuid", "EffectType" };
+    private static readonly string[] _nested  = { "LogicEffect", "BuffInfos", "BuffEffects" };
+    private static void Warm(Type? t, int depth = 0)
     {
-        int n = Int(Prop(list, "Count"));
-        var item = list.GetType().GetProperty("Item");
-        for (int i = 0; i < n; i++) yield return item?.GetValue(list, new object[] { i });
+        if (t == null || depth > 4 || t.IsValueType || _acc.ContainsKey((t, "Count"))) return;
+        try
+        {
+            foreach (var m in _scalars) Get(t, m);
+            if (Get(t, Indexer) != null) Warm(t.GetProperty("Item")?.PropertyType, depth + 1);
+            foreach (var m in _nested)
+                if (t.GetProperty(m, Inst) is { } pi) { Get(t, m); Warm(pi.PropertyType, depth + 1); }
+            if (t.GetProperty("RawData", Inst) is { } raw) { Get(t, "RawData"); Get(raw.PropertyType, ToBytes); }
+        }
+        catch (Exception ex) { LogOnce("warm " + t.Name, ex); }
     }
 
     // ByteString → bytes via its own ToByteArray() (dump.cs: `public byte[] ToByteArray()`; the interop surfaces an
-    // Il2Cpp array, enumerated generically).
+    // Il2CppStructArray<byte>). Never enumerate/index it element by element: Length / this[i] / CopyTo cost ~5 native
+    // calls PER BYTE (Plugin-Performance-Rules.md §3). AsSpan() reads the length once and views the native buffer, so
+    // ToArray() is one memcpy — byte-identical to the old per-element copy.
     private static byte[]? Bytes(object? bs)
     {
         if (bs == null) return null;
-        var arr = bs.GetType().GetMethod("ToByteArray", Type.EmptyTypes)?.Invoke(bs, null);
+        var arr = Get(bs.GetType(), ToBytes)?.Obj?.Invoke(bs);
+        if (arr is Il2CppStructArray<byte> sa) return sa.AsSpan().ToArray();
         if (arr is byte[] b) return b;
         if (arr is IEnumerable<byte> e) return new List<byte>(e).ToArray();
         if (arr is IEnumerable ne) { var l = new List<byte>(); foreach (var x in ne) l.Add(Convert.ToByte(x)); return l.ToArray(); }
@@ -286,18 +390,27 @@ internal static class McBuffEffectPatch
     private static long Long(object? o) { try { return o == null ? 0 : Convert.ToInt64(o); } catch { return 0; } }
 
     // BuffComp → ZComponent.Host (ZEntity) → Uuid (base-walk; mirrors TargetLens BuffTrackPatch.GetHostEntityUuid).
-    private static PropertyInfo? _piHost, _piHostUuid;
+    private static Acc? _accHost, _accHostUuid;
     private static bool _hostResolved;
     private static long HostUuid(object comp)
     {
         if (!_hostResolved)
         {
             _hostResolved = true;
-            for (var cur = comp.GetType(); cur != null && _piHost == null; cur = cur.BaseType)
-                _piHost = cur.GetProperty("Host", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            _piHostUuid = _piHost?.PropertyType.GetProperty("Uuid", BindingFlags.Public | BindingFlags.Instance);
+            PropertyInfo? piHost = null;
+            for (var cur = comp.GetType(); cur != null && piHost == null; cur = cur.BaseType)
+                piHost = cur.GetProperty("Host", Inst);
+            var piUuid = piHost?.PropertyType.GetProperty("Uuid", BindingFlags.Public | BindingFlags.Instance);
+            if (piHost != null) _accHost = BindProp(comp.GetType(), piHost);
+            if (piUuid != null) _accHostUuid = BindProp(piHost!.PropertyType, piUuid);
         }
-        try { var h = _piHost?.GetValue(comp); return h == null ? 0 : Long(_piHostUuid?.GetValue(h)); } catch { return 0; }
+        try
+        {
+            var h = _accHost?.Obj?.Invoke(comp);
+            if (h == null || _accHostUuid == null) return 0;
+            return _accHostUuid.Num != null ? _accHostUuid.Num(h) : Long(_accHostUuid.Obj?.Invoke(h));
+        }
+        catch { return 0; }
     }
 
     private static readonly HashSet<string> _logged = new();
