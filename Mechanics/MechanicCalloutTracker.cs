@@ -167,6 +167,14 @@ internal sealed partial class MechanicCalloutTracker : IDisposable
     // ── Poll ─────────────────────────────────────────────────────────────────────────────────────────────────
     private void Poll()
     {
+        McPerf.MaybeFlush(_services.Log.Info);   // [MechPerf] line every 10 s while framework diagnostics are on (McPerf.cs)
+        var pm = McPerf.Begin();
+        PollCore();
+        McPerf.End(McPerf.Poll, pm);
+    }
+
+    private void PollCore()
+    {
         try
         {
             if (_services.ClientState.Phase != GamePhase.World
@@ -188,9 +196,11 @@ internal sealed partial class MechanicCalloutTracker : IDisposable
             McBuffEffectPatch.Active = true;    // record PlayEffect ids only while in a supported scene
 
             bool full = (_tickCount++ & 1) == 0 || _ents.Count == 0;
-            if (full) ScanEntities(def);
+            var m = McPerf.Begin();
+            if (full) { ScanEntities(def); McPerf.End(McPerf.Scan, m); m = McPerf.Begin(); }
             SampleCasts();
-            if (full) BuildRows(def);
+            McPerf.End(McPerf.Casts, m);
+            if (full) { m = McPerf.Begin(); BuildRows(def); McPerf.End(McPerf.Rows, m); }
         }
         catch (Exception ex)
         {

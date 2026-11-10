@@ -34,12 +34,18 @@ internal sealed partial class MechanicCalloutTracker
         UpdateLocalPos();
         if (def.Kind == SceneKind.Raid) UpdateRaidArena();
         if (!RaidRingGate(def)) TableRows(def);   // raid ring arena: upstream skips the callout/phase rows
+        var m = McPerf.Begin();
         ApplyRules(def);
+        McPerf.End(McPerf.Rules, m);
         Reconcile();
         if (def.Kind == SceneKind.Raid) RaidReleaseCheck();   // boss release buff = hit moment (Release.cs)
         Flatten();
+        m = McPerf.Begin();
         DetectOccurrences(def);                 // new-occurrence events (Occurrence.cs) — alerts / voice
+        McPerf.End(McPerf.Occur, m);
+        m = McPerf.Begin();
         BuildMinimap(def);
+        McPerf.End(McPerf.Minimap, m);
     }
 
     // Adds or merges a row. createMs = server-epoch ms (buff timing); startTick = TickCount64 for locally-observed

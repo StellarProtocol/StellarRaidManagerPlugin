@@ -83,6 +83,7 @@ internal static class McBuffEffectPatch
     private static void PrefixOnAddBuff(object __instance, object __0)
     {
         if (!Active || __0 == null) return;
+        var pm = McPerf.Begin();
         try
         {
             long host = Long(Prop(__0, "HostUuid"));
@@ -90,11 +91,13 @@ internal static class McBuffEffectPatch
             ProcessBuffInfo(host, __0);
         }
         catch (Exception ex) { LogOnce("OnAddBuff", ex); }
+        finally { McPerf.EndHook(pm); }
     }
 
     private static void PrefixOnBuffEffectSync(object __instance, object __0)
     {
         if (!Active || __0 == null) return;
+        var pm = McPerf.Begin();
         try
         {
             long compHost = 0;
@@ -107,12 +110,14 @@ internal static class McBuffEffectPatch
             }
         }
         catch (Exception ex) { LogOnce("OnBuffEffectSync", ex); }
+        finally { McPerf.EndHook(pm); }
     }
 
     // __0 = ZEntity, __1 = BuffInfoSync (may be null), __2 = BuffEffectSync (may be null).
     private static void PrefixParseBuff(object __0, object __1, object __2)
     {
         if (!Active) return;
+        var pm = McPerf.Begin();
         try
         {
             long entHost = __0 != null ? Long(Prop(__0, "Uuid")) : 0;
@@ -128,6 +133,7 @@ internal static class McBuffEffectPatch
             }
         }
         catch (Exception ex) { LogOnce("parseBuff", ex); }
+        finally { McPerf.EndHook(pm); }
     }
 
     private static long HostOr(long a, long b) => a != 0 ? a : b;
