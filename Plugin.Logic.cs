@@ -98,6 +98,7 @@ public sealed partial class Plugin
     {
         // Punctuate Mark Presets: drain the load queue (one mark/frame) + poll the live placed-count.
         TickMarks(deltaTime);
+        TickHelp();   // help popover: first-open re-anchor + close with its window (Plugin.Help.cs)
 
         if (_running)
         {

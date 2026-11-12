@@ -72,8 +72,7 @@ public sealed partial class Plugin
 
     // Name buffer for the "create preset" input field.
     private string _newPresetName = "";
-    // Transient status line shown in the window.
-    private string _marksStatus = "";
+    // (The transient feedback line is the window footer — Plugin.Marks.Edit.cs SetMarksStatus.)
 
     private IWindowControl _marksWindow = null!;
 
@@ -89,7 +88,6 @@ public sealed partial class Plugin
     private void InitMarks()
     {
         _marksCfg = _services.Config.GetSection("marks");
-        _trashPng = BuildTrashIconPng();   // Plugin.TrashIcon.cs — per-row Delete button icon
         LoadPresetsFromConfig();
         RegisterMarksWindow();   // Plugin.Marks.Ui.cs
         RegisterImportWindow();  // Plugin.Marks.ImportWindow.cs — share-code paste window
@@ -119,60 +117,11 @@ public sealed partial class Plugin
         _importWindow?.Remove();
         _exportWindow?.Remove();
     }
-
-    // ── NoticeTip feedback (subtle, on-screen — mirrors the window status line) ────────────────────────────────────
-    // These fire often (Activate + every Prev/Next/Reset), so keep them short and SILENT — deliberately NOT the
-    // Special banner + DungeonVictory sound the /rw path uses. Fully guarded: a notice failure must never break
-    // navigation or crash the game.
-    private void ShowMarksNotice(string content)
-    {
-        try
-        {
-            _services.NoticeTips
-                .Create(NoticeTipType.PopTip)       // neutral center pop-tip (not the /rw Special banner)
-                .WithContent(content)
-                .WithAudio(NoticeTipAudio.Silent)   // silent — nav tips fire too often to sound
-                .WithDuration(2.0f)
-                .Show();
-        }
-        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] notice tip failed: {ex.Message}"); }
-    }
-
-    // Error variant — used when a step hotkey is pressed with no preset active (a rare misuse, so a short center
-    // pop-tip with a light error cue is warranted). Still fully guarded.
-    private void ShowMarksError(string content)
-    {
-        try
-        {
-            _services.NoticeTips
-                .Create(NoticeTipType.PopTip)       // same neutral pop-tip; audible error cue kept below
-                .WithContent(content)
-                .WithAudio(NoticeTipAudio.ErrorTip)
-                .WithDuration(2.5f)
-                .Show();
-        }
-        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] notice tip failed: {ex.Message}"); }
-    }
-
-    // Localized "resulting step" line for a nav op. Step 0 (the blank anchor) reads "Start"; a real step k reads
-    // "Step k / N" where N == the real step count (Steps[0] is the anchor, so N = Steps.Count - 1).
-    // A non-empty step comment is appended (notice.stepComment) so it shows mid-fight from the hotkeys too.
-    private string MarksStepNotice(MarkPreset p)
-    {
-        if (_currentStep <= 0) return _loc.TFormat("rm.marks.notice.start", p.Name);
-        string c = _currentStep < p.Steps.Count ? p.Steps[_currentStep].Comment ?? "" : "";
-        return c.Length > 0
-            ? _loc.TFormat("rm.marks.notice.stepComment", p.Name, _currentStep, p.Steps.Count - 1, c)
-            : _loc.TFormat("rm.marks.notice.step", p.Name, _currentStep, p.Steps.Count - 1);
-    }
-
     // Pumped from OnUpdate (Plugin.Logic.cs). Drains the load queue one mark per frame — Framework.Update runs on
     // the main thread before LateUpdate, which is exactly the timing the indicatorPos_ write needs.
     private void TickMarks(float deltaTime)
     {
-        // First-open anchor re-apply for the share-code popups (Plugin.Marks.ImportWindow.cs / .ExportWindow.cs).
-        TickPopupReposition(_importWindow, _importRect, ref _importRepositionTicks);
-        TickPopupReposition(_exportWindow, _exportRect, ref _exportRepositionTicks);
+        TickMarksFooter();         // expire the ~3 s footer feedback line (Plugin.Marks.Edit.cs)
         MkTickVerify(deltaTime);   // one-shot post-placement verification (Plugin.Marks.AutoCombo.cs)
 
         if (_loadQueue.Count > 0)
@@ -183,7 +132,7 @@ public sealed partial class Plugin
             if (_loadQueue.Count == 0)
             {
                 MkArmVerify();   // intended-vs-actual log ~0.5 s from now (Plugin.Marks.AutoCombo.cs)
-                _marksStatus = _loc.T("rm.marks.stepPlaced");
+                SetMarksStatus(_loc.T("rm.marks.stepPlaced"));
                 _marksWindow?.MarkDirty();
             }
         }
@@ -210,13 +159,13 @@ public sealed partial class Plugin
 
         if (_presets.Exists(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
         {
-            _marksStatus = _loc.TFormat("rm.marks.dupName", name);
+            SetMarksStatus(_loc.TFormat("rm.marks.dupName", name), ok: false);
             _marksWindow?.MarkDirty();
             return;
         }
         if (_presets.Count >= MaxPresets)
         {
-            _marksStatus = _loc.TFormat("rm.marks.limit", MaxPresets);
+            SetMarksStatus(_loc.TFormat("rm.marks.limit", MaxPresets), ok: false);
             _marksWindow?.MarkDirty();
             return;
         }
@@ -224,10 +173,11 @@ public sealed partial class Plugin
         // Every preset owns a permanent blank Step 0 (the "Start" anchor); real layouts are appended as steps 1..N.
         _presets.Add(new MarkPreset { Name = name, Steps = { new MarkStep() } });
         _editingIdx = -1;   // list changed — drop any in-progress rename (it is keyed by index)
+        _pendingDeleteIdx = -1;   // … and any open delete confirm (also index-keyed, Plugin.Marks.Edit.cs)
         CancelStepCommentEdit();
         _newPresetName = "";
         SavePresetsToConfig();
-        _marksStatus = _loc.TFormat("rm.marks.created", name);
+        SetMarksStatus(_loc.TFormat("rm.marks.created", name));
         _marksWindow?.MarkDirty();
         _services.Log.Info($"[MarkPresets] created '{name}'");
     }
@@ -241,7 +191,7 @@ public sealed partial class Plugin
         _activeIndex = index;
         _currentStep = 0;   // land on the blank Start anchor; pure selection — do NOT apply/place anything
         SavePresetsToConfig();   // also persists the active-preset name
-        _marksStatus = _loc.TFormat("rm.marks.activated", _presets[index].Name);
+        SetMarksStatus(_loc.TFormat("rm.marks.activated", _presets[index].Name));
         _marksWindow?.MarkDirty();
         ShowMarksNotice(_loc.TFormat("rm.marks.notice.activated", _presets[index].Name));
     }
@@ -260,7 +210,7 @@ public sealed partial class Plugin
         _activeIndex = -1;
         _currentStep = -1;              // nothing applied yet (matches the no-active-preset load state)
         SavePresetsToConfig();          // persists the cleared active-preset name (stays deactivated on relaunch)
-        _marksStatus = _loc.TFormat("rm.marks.notice.deactivated", name);
+        SetMarksStatus(_loc.TFormat("rm.marks.notice.deactivated", name));
         _marksWindow?.MarkDirty();
         ShowMarksNotice(_loc.TFormat("rm.marks.notice.deactivated", name));
     }
@@ -271,6 +221,7 @@ public sealed partial class Plugin
         string name = _presets[index].Name;
         _presets.RemoveAt(index);
         _editingIdx = -1;   // indices shifted — an in-progress rename would now point at the wrong row
+        _pendingDeleteIdx = -1;   // the confirm is done (or pointed at a shifted index)
         CancelStepCommentEdit();
         ClearExportCode();  // _exportPresetIdx is an index too — shifted/removed along with the list
 
@@ -279,7 +230,7 @@ public sealed partial class Plugin
         else if (_activeIndex > index) _activeIndex--;
 
         SavePresetsToConfig();
-        _marksStatus = _loc.TFormat("rm.marks.deleted", name);
+        SetMarksStatus(_loc.TFormat("rm.marks.deleted", name));
         _marksWindow?.MarkDirty();
     }
 
@@ -293,7 +244,7 @@ public sealed partial class Plugin
         var marks = MkReadOwnMarks();
         if (marks.Count == 0)
         {
-            _marksStatus = _loc.T("rm.marks.noMarks");
+            SetMarksStatus(_loc.T("rm.marks.noMarks"), ok: false);
             _marksWindow?.MarkDirty();
             return;
         }
@@ -304,7 +255,7 @@ public sealed partial class Plugin
         p.Steps.Add(new MarkStep { Marks = marks });
         _currentStep = p.Steps.Count - 1;   // cursor lands on the freshly-added step
         SavePresetsToConfig();
-        _marksStatus = _loc.TFormat("rm.marks.stepSaved", _currentStep, marks.Count);
+        SetMarksStatus(_loc.TFormat("rm.marks.stepSaved", _currentStep, marks.Count));
         _marksWindow?.MarkDirty();
         _services.Log.Info($"[MarkPresets] '{p.Name}' saved step {_currentStep} with {marks.Count} marks");
     }
@@ -348,7 +299,7 @@ public sealed partial class Plugin
         if (p == null) return;
         if (_currentStep <= 0)                       // Step 0 is the permanent blank anchor — never deletable
         {
-            _marksStatus = _loc.T("rm.marks.stepZeroProtected");
+            SetMarksStatus(_loc.T("rm.marks.stepZeroProtected"), ok: false);
             _marksWindow?.MarkDirty();
             return;
         }
@@ -361,7 +312,7 @@ public sealed partial class Plugin
         if (_currentStep >= p.Steps.Count) _currentStep = p.Steps.Count - 1;   // clamp; falls back to 0 (anchor)
 
         SavePresetsToConfig();
-        _marksStatus = _loc.TFormat("rm.marks.stepDeleted", shown);            // do NOT auto-apply after a delete
+        SetMarksStatus(_loc.TFormat("rm.marks.stepDeleted", shown));            // do NOT auto-apply after a delete
         _marksWindow?.MarkDirty();
     }
 
@@ -380,60 +331,14 @@ public sealed partial class Plugin
 
         if (i == 0)
         {
-            _marksStatus = _loc.T("rm.marks.clearedToStart");
+            SetMarksStatus(_loc.T("rm.marks.clearedToStart"));
             _marksWindow?.MarkDirty();
             _services.Log.Info($"[MarkPresets] '{p.Name}' cleared to Start (step 0)");
             return;
         }
 
-        _marksStatus = _loc.TFormat("rm.marks.applying", i, step.Marks.Count);   // real step number == index
+        SetMarksStatus(_loc.TFormat("rm.marks.applying", i, step.Marks.Count));   // real step number == index
         _marksWindow?.MarkDirty();
         _services.Log.Info($"[MarkPresets] applying '{p.Name}' step {i} ({step.Marks.Count} marks)");
-    }
-
-    // ── Persistence (presets JSON + active-preset name, both in the 'marks' config section) ───────────────────────
-    private void LoadPresetsFromConfig()
-    {
-        _presets.Clear();
-        _activeIndex = -1;
-        _currentStep = -1;
-        try
-        {
-            string json = _marksCfg.Get<string>("presets", "") ?? "";
-            if (json.Length > 0)
-            {
-                var list = JsonSerializer.Deserialize<List<MarkPreset>>(json);
-                if (list != null) _presets.AddRange(list);
-            }
-
-            // Migration: every preset must own a blank Step 0 anchor. Old presets (saved before this feature) have
-            // real layouts starting at Steps[0] — prepend an empty step so their first layout isn't mistaken for it.
-            foreach (var p in _presets)
-                if (p.Steps.Count == 0 || p.Steps[0].Marks.Count > 0)
-                    p.Steps.Insert(0, new MarkStep());
-
-            // A step with an explicit JSON null comment would otherwise carry null past the initializer.
-            foreach (var p in _presets)
-                foreach (var st in p.Steps)
-                    st.Comment ??= "";
-
-            // Resolve the persisted active name back to an index; the cursor lands on Step 0 (the blank anchor).
-            string active = _marksCfg.Get<string>("active", "") ?? "";
-            if (active.Length > 0)
-                _activeIndex = _presets.FindIndex(p => string.Equals(p.Name, active, StringComparison.OrdinalIgnoreCase));
-            _currentStep = _activeIndex >= 0 ? 0 : -1;
-        }
-        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] preset load failed: {ex.Message}"); }
-    }
-
-    private void SavePresetsToConfig()
-    {
-        try
-        {
-            _marksCfg.Set<string>("presets", JsonSerializer.Serialize(_presets));
-            _marksCfg.Set<string>("active", ActivePreset()?.Name ?? "");
-            _marksCfg.Save();
-        }
-        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] preset save failed: {ex.Message}"); }
     }
 }

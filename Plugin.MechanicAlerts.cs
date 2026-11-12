@@ -9,8 +9,9 @@ namespace Stellar.RaidManager;
 // banner "<MECHANIC> — YOU" in the mechanic colour with a countdown appears on a HUD window (up to 3 stacked, newest
 // on top) and stays until the row ends (untimed mechanics: 5 s); optionally the built-in chime plays through
 // MechAudioPlayer (local speakers, winmm). Raid danger tiles (Phase Mapping, Edge-Mid / Corner Explosion) get a
-// "MOVE OFF" banner instead (Plugin.MechanicAlerts.Banner.cs). Settings are the "Mechanic Alerts" section of the
-// Mechanic Callouts window.
+// "MOVE OFF" banner instead (Plugin.MechanicAlerts.Banner.cs). Settings are the ON-ME ALERT section of the Mechanic
+// Callouts window (Plugin.MechanicCallouts.Ui.cs), whose header "Test alert" works even with the alert off: the banner
+// HUD is registered for the test and removed again once it ends (TestOnMeAlert / EndAlertTest).
 // Config keys: mech_alert_on / _sound / _volume / _scale. (Experiment's custom sound file, untimed-duration slider
 // and voice callouts are deliberately not ported.)
 // The tracker must be polling for occurrences to fire — it runs while the list OR the minimap OR alerts are enabled.
@@ -39,7 +40,24 @@ public sealed partial class Plugin
     private void DisposeMechanicAlerts()
     {
         if (_mechTracker != null) _mechTracker.Occurrence -= OnMechOccurrence;
+        _alertTestTick?.Dispose(); _alertTestTick = null;
         _mechAudio?.Dispose();
+    }
+
+    // "Test alert" with the alert OFF: the banner HUD only exists while the alert is on (ApplyMechHudWindows), so the test
+    // registers it for the test's 8 s (ShouldRender lets it draw while _alertTestUntil is ahead) and a 1 Hz check removes
+    // it again afterwards — unless the alert was switched on meanwhile, which keeps it.
+    private const long AlertTestMs = 8000;
+    private long _alertTestUntil;
+    private IDisposable? _alertTestTick;
+
+    private bool AlertTestRunning => Environment.TickCount64 < _alertTestUntil;
+
+    private void EndAlertTest()
+    {
+        if (AlertTestRunning) return;
+        _alertTestTick?.Dispose(); _alertTestTick = null;
+        if (!_alertOn) RemoveMechHud(ref _mechAlertHud);
     }
 
     private void OnMechOccurrence(McOccurrence o)
@@ -71,6 +89,12 @@ public sealed partial class Plugin
 
     private void TestOnMeAlert()
     {
+        _alertTestUntil = Environment.TickCount64 + AlertTestMs;
+        if (!_alertOn && _mechAlertHud == null)
+        {
+            RegisterMechAlertHud();   // temporary — EndAlertTest removes it once the test banner is done
+            _alertTestTick ??= _services.Framework.Every(TimeSpan.FromSeconds(1), EndAlertTest);
+        }
         string label = McText.T("Execution Sentence") + " x2";
         var row = new McRow
         {
@@ -81,33 +105,4 @@ public sealed partial class Plugin
                                          Row = row, IsLocalTarget = true },
                       testMs: 8000);
     }
-
-    // "Mechanic Alerts" section of the Mechanic Callouts window (Plugin.MechanicCallouts.cs).
-    private HudElement BuildMechAlertSection() => new ColumnElement(new HudElement[]
-    {
-        new TextElement(() => _loc.T("rm.mech.alert.title"), Emphasis: true),
-        new TextElement(() => _loc.T("rm.mech.alert.help"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-        MechIndent(
-            MechToggleRow("rm.mech.alert.enable", () => _alertOn, v =>
-            {
-                _alertOn = v; SetMechBool("mech_alert_on", v); ApplyMechHudWindows(); ApplyMechTrackerEnabled();
-            }),
-            // Sound / volume / size / test only while the on-me alert is on (hidden otherwise).
-            new ConditionalElement(() => _alertOn, MechIndent(
-                MechToggleRow("rm.mech.alert.sound", () => _alertSound, v => { _alertSound = v; SetMechBool("mech_alert_sound", v); }),
-                MechSliderRow("rm.mech.alert.volume", () => _alertVolume, v =>
-                {
-                    _alertVolume = v;
-                    _cfg.Set<float>("mech_alert_volume", _alertVolume); _cfg.Save();
-                }, 0f, 1f, () => $"{_alertVolume * 100f:0}%"),
-                MechSliderRow("rm.mech.alert.size", () => _alertScale, v =>
-                {
-                    _alertScale = Math.Clamp(MathF.Round(v * 2f) / 2f, 1f, 6f);   // 0.5 steps
-                    _cfg.Set<float>("mech_alert_scale", _alertScale); _cfg.Save();
-                }, 1f, 6f, () => $"{_alertScale:0.0}x"),
-                new RowElement(new HudElement[]
-                {
-                    new ButtonElement(() => _loc.T("rm.mech.alert.test"), OnClick: TestOnMeAlert),
-                }, Gap: 8f)))),
-    }, Gap: 8f);
 }

@@ -16,8 +16,8 @@ namespace Stellar.RaidManager;
 // Countdowns end at the HIT via a hardcoded per-mechanic offset table (Mechanics/MechanicCalloutTracker.HitOffset.cs;
 // tuned in the Experiment plugin, no user adjustment here).
 //
-// The sub-menu is opened from a button in the Raid Manager settings window (Plugin.Settings.cs); it has no launcher
-// tile and no hotkeys. Config lives in the plugin's "settings" section, keys prefixed `mech_`. Every label goes
+// The settings window (Plugin.MechanicCallouts.Ui.cs) is opened from the hub's "Mechanic Callouts" card (Plugin.Hub.cs);
+// it has no launcher tile and no hotkeys. Config lives in the plugin's "settings" section, keys prefixed `mech_`. Every label goes
 // through _loc.T("rm.mech.*") (Rule 10); mechanic/arena names through McText (rm.mech.n.*).
 public sealed partial class Plugin
 {
@@ -42,17 +42,10 @@ public sealed partial class Plugin
             ListOrder = (MechanicCalloutTracker.ListOrderMode)Math.Clamp(_cfg.Get<int>("mech_order", 0), 0, 2),
         };
         _mechWindow = _services.Windows.Register(new WindowRegistration(
-            Spec: new WindowSpec(
-                Id: "raidmanager.mech.settings",
-                Title: _loc.T("rm.mech.title"),
-                DefaultRect: new WindowRect(960f, 240f, 480f, 0f),
-                Category: WindowCategory.Tools,
-                Style: WindowPanelStyle.GlassMenu)
-            {
-                Draggable = true, Closable = true, StartVisible = false,
-                ShouldRender = () => MechInWorld,
-            },
-            Root: BuildMechCalloutRoot(),
+            // House-style tool window (Plugin.cs ToolSpec), prebuilt: ~20 setting rows, two columns.
+            Spec: ToolSpec("raidmanager.mech.settings", "rm.mech.title", new WindowRect(760f, 240f, MechWidth, 0f),
+                prebuild: true),
+            Root: BuildMechCalloutRoot(),   // Plugin.MechanicCallouts.Ui.cs
             OnClose: () => _mechWindow.SetVisible(false)));
         _mechWindows.Add(_mechWindow);
 
@@ -112,120 +105,7 @@ public sealed partial class Plugin
         _cfg.Save();
     }
 
-    // Three sections in the Mark Presets style (Emphasis header + separator between sections). Each section's master
-    // toggle is indented one level under its header; sub-options sit one level deeper and are HIDDEN (not greyed)
-    // while the master is off — ConditionalElement drops them and the auto-height GlassMenu shrinks to fit.
-    private HudElement BuildMechCalloutRoot() => new ColumnElement(new HudElement[]
-    {
-        new TextElement(() => _loc.T("rm.mech.title"), Emphasis: true),
-        new TextElement(() => _loc.T("rm.mech.intro"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-        new TextElement(() => _loc.T("rm.mech.help"), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted),
-        new SeparatorElement(),
-
-        // ── Callout List ──
-        new TextElement(() => _loc.T("rm.mech.list.title"), Emphasis: true),
-        MechIndent(
-            MechToggleRow("rm.mech.list.enable", () => _mechEnabled, v =>
-            {
-                _mechEnabled = v;
-                ApplyMechHudWindows();
-                ApplyMechTrackerEnabled();
-                SetMechBool("mech_enabled", v);
-            }),
-            new ConditionalElement(() => _mechEnabled, MechIndent(
-                new RowElement(new HudElement[]
-                {
-                    new TextElement(() => _loc.T("rm.mech.list.order")),
-                    new DropdownElement(
-                        Selected: () => (int)_mechTracker.ListOrder,
-                        Options:  () => Array.ConvertAll(MechOrderKeys, _loc.T),
-                        OnSelect: v =>
-                        {
-                            _mechTracker.ListOrder = (MechanicCalloutTracker.ListOrderMode)Math.Clamp(v, 0, 2);
-                            _cfg.Set<int>("mech_order", (int)_mechTracker.ListOrder);
-                            _cfg.Save();
-                        },
-                        Width: 220f),
-                }, Gap: 6f),
-                MechSliderRow("rm.mech.list.textSize", () => _mechHudScale, SetMechHudScale, 0.75f, 2f,
-                    () => $"{_mechHudScale:0.00}x"),
-                MechSliderRow("rm.mech.list.bgOpacity", () => _mechBgOpacity, SetMechBgOpacity, 0f, 1f,
-                    () => $"{_mechBgOpacity * 100f:0}%")))),
-        new SeparatorElement(),
-
-        // ── Minimap ──
-        new TextElement(() => _loc.T("rm.mech.map.title"), Emphasis: true),
-        MechIndent(
-            MechToggleRow("rm.mech.map.enable", () => _mechMapEnabled, v =>
-            {
-                _mechMapEnabled = v;
-                ApplyMechHudWindows();
-                ApplyMechTrackerEnabled();
-                SetMechBool("mech_map_enabled", v);
-            }),
-            new ConditionalElement(() => _mechMapEnabled, MechIndent(
-                MechSliderRow("rm.mech.map.size", () => _mechMapScale, SetMechMapScale, MechMapScaleMin, MechMapScaleMax,
-                    () => $"{_mechMapScale:0.0}x"),   // Plugin.MechanicMinimap.cs
-                MechMapBgOpacityRow(),       // background + game map opacity (Plugin.MechanicMinimap.GameMap.cs)
-                MechMapRotationRow(),        // "Map rotation" dropdown (Plugin.MechanicMinimap.Rotation.cs)
-                MechToggleRow("rm.mech.map.markers", () => _mechMapMarkers, v =>
-                {
-                    _mechMapMarkers = v;
-                    ApplyMechMapOptions();
-                    SetMechBool("mech_map_markers", v);
-                }),
-                MechToggleRow("rm.mech.map.hideNormal", () => _mechMapHideNormal, v =>
-                {
-                    _mechMapHideNormal = v;
-                    ApplyMechMapOptions();
-                    SetMechBool("mech_map_hidenormal", v);
-                }),
-                MechToggleRow("rm.mech.map.camCone", () => _mechMapCamCone, v =>
-                {
-                    _mechMapCamCone = v;
-                    ApplyMechMapOptions();
-                    SetMechBool("mech_map_camcone", v);
-                }),
-                MechToggleRow("rm.mech.map.gameMap", () => _mechMapGameMap, SetMechMapGameMap),   // .GameMap.cs
-                MechToggleRow("rm.mech.map.floor", () => _mechMapFloor, v =>
-                {
-                    _mechMapFloor = v;
-                    ApplyMechMapOptions();
-                    SetMechBool("mech_map_floor", v);
-                })))),
-        new SeparatorElement(),
-
-        // ── Mechanic Alerts ──
-        BuildMechAlertSection(),    // Plugin.MechanicAlerts.cs — "Mechanic Alerts" in this same menu
-    }, Gap: 8f);
-
-    // One indentation level: a fixed spacer (12 + the 6 px row gap = 18 px) before a stretching column, so nested
-    // rows (incl. sliders, which need the leftover width) still fill the window.
-    private static HudElement MechIndent(params HudElement[] children) => new RowElement(new HudElement[]
-    {
-        new SpacerElement(Width: 12f, Height: 0f),
-        new CellElement(new ColumnElement(children, Gap: 8f), Weight: 1f),
-    }, Gap: 6f);
-
     // "List order" options, index = MechanicCalloutTracker.ListOrderMode.
     private static readonly string[] MechOrderKeys =
         { "rm.mech.list.order.arrival", "rm.mech.list.order.urgent", "rm.mech.list.order.table" };
-
-    // Capsule toggle + sibling label (ToggleElement is capsule-only — same row shape as Plugin.Settings.cs).
-    private HudElement MechToggleRow(string labelKey, Func<bool> get, Action<bool> set) =>
-        new RowElement(new HudElement[]
-        {
-            new ToggleElement(() => "", Get: get, Set: set),
-            new TextElement(() => _loc.T(labelKey)),
-        }, Gap: 6f);
-
-    // Label | slider (takes the leftover width — a slider squeezed by fixed cells collapses to a pill,
-    // WindowBuilder-Patterns.md) | value readout.
-    private HudElement MechSliderRow(string labelKey, Func<float> get, Action<float> set, float min, float max, Func<string> value) =>
-        new RowElement(new HudElement[]
-        {
-            new CellElement(new TextElement(() => _loc.T(labelKey), Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Width: 110f),
-            new CellElement(new SliderElement(Get: get, Set: v => set(Math.Clamp(v, min, max)), Min: min, Max: max), Weight: 1f),
-            new CellElement(new TextElement(value), Width: 56f),
-        }, Gap: 6f);
 }

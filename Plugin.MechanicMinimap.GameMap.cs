@@ -42,13 +42,14 @@ public sealed partial class Plugin
     }
 
     // Live while dragging: the value is in the painter's layer key, so the forced repaint re-bakes the background.
-    private HudElement MechMapBgOpacityRow() => MechSliderRow("rm.mech.map.bgOpacity", () => _mechMapBgOpacity, v =>
+    // ("Background" slider in the Mechanic Callouts window, Plugin.MechanicCallouts.Ui.cs.)
+    private void SetMechMapBgOpacity(float v)
     {
         _mechMapBgOpacity = Math.Clamp(MathF.Round(v * 20f) / 20f, MechMapBgOpacityMin, MechMapBgOpacityMax);   // 5 % steps
         _cfg.Set<float>("mech_map_bgopacity", _mechMapBgOpacity); _cfg.Save();
         _mechMapPainter.BgOpacity = _mechMapBgOpacity;
         _mechMapPaintedVersion = int.MinValue;
-    }, MechMapBgOpacityMin, MechMapBgOpacityMax, () => $"{_mechMapBgOpacity * 100f:0}%");
+    }
 
     // Texture getter hook (before the paint): keep painter.Art = the art for the LIVE view (or null), forcing a repaint
     // whenever it changes so the static layer re-bakes.
