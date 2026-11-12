@@ -69,7 +69,9 @@ public sealed partial class Plugin
     // took the cell's slack (a Column in a Row is flexible) → the caption drew LEFT-aligned and the ▾ hugged the right
     // edge, unlike the live dropdown (seen in-game 2026-11-12). The 1 px drop is done with a 2 px spacer over the WHOLE
     // row instead (26 px struts, = the framework's 2 px top padding), and the ▾ sits over a 2 px spacer to stay centred.
-    private const float DropdownW = 176f;
+    // 196 = the widest that fits a sub-option row of the 364 px Mechanic Callouts column interior (8 + 112 + 196 + 24 + 4 × 6\r
+    // gaps); caption room 158 px bold-13 fits "90° counter-clockwise" (en, ≈150) — 176 cut it.\r
+    private const float DropdownW = 196f;
 
     private HudElement PillDropdown(Func<int> selected, Func<IReadOnlyList<string>> options, Action<int> onSelect,
         float width, Func<bool>? enabled = null)

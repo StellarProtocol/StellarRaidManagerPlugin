@@ -11,8 +11,8 @@ namespace Stellar.RaidManager;
 public sealed partial class Plugin
 {
     private const float OnOffChipW  = 64f;
-    private const float OptionChipW = 64f;
-    private const float StyleChipW  = 96f;   // "Game notice" / "Red overlay"
+    private const float OptionChipW = 80f;   // "Katamtaman" (fil) / "パーティー" (ja) at the fixed 14 px plain size
+    private const float StyleChipW  = 112f;  // "Game notice" / "Red overlay" — "Notifikasi game" (id) is the longest
 
     // A clickable 24 px chip in a fixed-width cell: Cell → round Bubble (fill + hover) → Bare Selectable → Row[24 px
     // strut, label]. The caller swaps complete variants with a ConditionalElement (bold can't toggle live), all in the

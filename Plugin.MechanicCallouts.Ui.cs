@@ -6,7 +6,7 @@ namespace Stellar.RaidManager;
 
 // ── Mechanic Callouts — the settings window (house redesign, approved 2026-11-12) ──────────────────────────────────
 //
-// 760 wide, two balanced, top-aligned columns (rule 17), CONSTANT height: left = CALLOUT LIST + ON-ME ALERT, right =
+// 800 wide, two balanced, top-aligned columns (rule 17), CONSTANT height: left = CALLOUT LIST + ON-ME ALERT, right =
 // MINIMAP. Header = ToolHeader (status "List on · Minimap on · Alert off — move them in the HUD layout editor", the
 // SAME builder as the hub card) + a Neutral "Test alert" pill (reachable even with the alert off). Toggles are 64×24
 // ON/OFF chips, sliders round-knob, dropdowns Pill. A section's sub-options are RECESSED — shown, dimmed, not clickable —
@@ -14,12 +14,21 @@ namespace Stellar.RaidManager;
 // Settings, config keys (mech_*), defaults and behaviour are unchanged; the setters are the ones the old rows used.
 public sealed partial class Plugin
 {
-    private const float MechWidth   = 760f;
+    // Label columns = the longest label in ANY locale (R10; 190 cut "Only teammates with a me…" in English). Every ON/OFF
+    // chip in a column lines up: main switches and indented chip sub-options both put the chip at x = 244 (14 px indent
+    // + 230). Sliders / dropdowns keep their own narrower column (112) so the slider still gets its room.
+    //   chip sub-options: "Only teammates with a mechanic" (en, ≈222 px bold-13), "Kakampi lang na may mekaniko" (fil)
+    //   main switches:    "Alerto kapag ikaw ang tinamaan" (fil, ≈219 px)
+    //   sliders/dropdown: "Lakas ng tunog" / "Ukuran banner" (≈105 px)
+    // Width 800 (was 760, R18): the 364 px column interior holds a dropdown row exactly (8 + 112 + 196 DropdownW + 24 "?"
+    // + 4 × 6 gaps); a chip row is 8 + 230 + 64 + 24 + 4 × 6 = 350.
+    private const float MechWidth   = 800f;
     private const float MechColGap  = 8f;
-    private const float MechColW    = (MechWidth - 24f - MechColGap) / 2f;   // 364: window pad 2×12
-    private const float MechMainLabelW = 118f;   // a section's main switch
-    private const float MechSubLabelW  = 104f;   // sliders / dropdowns (after the 14 px indent)
-    private const float MechChipLabelW = 190f;   // minimap on/off sub-options ("Only teammates with a mechanic")
+    private const float MechColW    = (MechWidth - 24f - MechColGap) / 2f;   // 384: window pad 2×12, interior 364
+    private const float MechSubLabelW  = 112f;                               // sliders / dropdowns (after the 14 px indent)
+    private const float MechChipLabelW = 230f;                               // ON/OFF sub-options (after the indent)
+    private const float MechMainLabelW = MechChipLabelW + RowIndent + RowGap; // a section's main switch: 244, chips aligned
+    private const float MechTestAlertW = 140f;   // "Subukan ang alerto" (fil) ≈136 px bold-13
 
     private const string ListSection  = "rm.mech.list.title";
     private const string AlertSection = "rm.mech.alert.title";
@@ -37,7 +46,7 @@ public sealed partial class Plugin
         return new ColumnElement(new HudElement[]
         {
             ToolHeader("callouts", () => _loc.T("rm.mech.title"), MechHeaderStatus, () => _mechWindow.SetVisible(false),
-                trailing: NeutralButton(() => _loc.T("rm.mech.alert.test"), TestOnMeAlert, 86f)),
+                trailing: NeutralButton(() => _loc.T("rm.mech.alert.test"), TestOnMeAlert, MechTestAlertW)),
             new RowElement(new HudElement[]
             {
                 TopColumn(MechColW, 8f,
@@ -53,7 +62,7 @@ public sealed partial class Plugin
                     SectionPanel(() => _loc.T(AlertSection), () => _loc.T("rm.mech.alert.hint"),
                         SettingRow("rm.mech.alert.enable", MechMainLabelW, MechTip("rm.mech.alert.enable", AlertSection, "rm.mech.alert.help"),
                             null, false, OnOffChip(alertOn, SetMechAlertOn)),
-                        SettingRow("rm.mech.alert.sound", MechSubLabelW, MechTip("rm.mech.alert.sound", AlertSection, "rm.mech.help.sound"),
+                        SettingRow("rm.mech.alert.sound", MechChipLabelW, MechTip("rm.mech.alert.sound", AlertSection, "rm.mech.help.sound"),
                             alertOn, true, OnOffChip(() => _alertSound, v => { _alertSound = v; SetMechBool("mech_alert_sound", v); }, alertOn)),
                         SliderRow("rm.mech.alert.volume", MechSubLabelW, MechTip("rm.mech.alert.volume", AlertSection, "rm.mech.help.volume"),
                             () => _alertVolume, SetAlertVolume, 0f, 1f, ValueText(() => _alertVolume, v => $"{v * 100f:0}%"), alertOn),
@@ -92,7 +101,7 @@ public sealed partial class Plugin
         }, Gap: 10f);
     }
 
-    // A minimap on/off sub-option: [indent][label 190][chip][flex][?], recessed while the minimap is off.
+    // A minimap on/off sub-option: [indent][label 230][chip][flex][?], recessed while the minimap is off.
     private HudElement MapChipRow(string labelKey, string helpKey, Func<bool> get, Action<bool> set)
     {
         Func<bool> mapOn = () => _mechMapEnabled;

@@ -5,7 +5,7 @@ using Stellar.Abstractions.Services;
 namespace Stellar.RaidManager;
 
 // "Countdown & Raid Warning" window (approved redesign 2026-11-12 — the COUNTDOWN / RAID WARNING sections that used to
-// fill the single settings window, now behind the hub's third card). 460 wide, constant height: ToolHeader (live status
+// fill the single settings window, now behind the hub's third card). 520 wide, constant height: ToolHeader (live status
 // shared with the hub card) + two SectionPanels of setting rows, each row ending in "?" (the old description sentences
 // live in the help popover), then the two Test pills. "Overlay size" is RECESSED (not hidden) while Style = Game notice.
 // Same config keys, defaults and behaviour as before (size / rw_size / ct_* / rw_*); /ct and /rw parsing is in
@@ -14,8 +14,11 @@ public sealed partial class Plugin
 {
     private IWindowControl _ctWindow = null!;
 
-    private const float CtWidth   = 460f;
-    private const float CtLabelW  = 118f;
+    private const float CtWidth   = 520f;
+    // Label column = the longest row label in ANY locale (R10): "Command ng countdown" (fil) / "Perintah hitung mundur"
+    // (id) ≈ 170 px bold-13 — 118 cut "Countdown com…" even in English. Width 520 (was 460, R18) = label + gap +
+    // 3 × 80 option chips + "?" inside the panel/window padding.
+    private const float CtLabelW  = 176f;
     private const string CtSection = "rm.countdown";
     private const string RwSection = "rm.raidWarning";
 
