@@ -40,8 +40,7 @@ public sealed partial class Plugin
                 new TextElement(() => _currentStep <= 0 ? _loc.T("rm.marks.blankBoard") : string.Empty,
                     Color: () => MutedColor(), NoWrap: true),
                 new SpacerElement(0f),
-                new ListElement(() => Math.Min(MaxDots, Math.Max(0, (ActivePreset()?.Steps.Count ?? 1) - 1)), BuildDots())
-                    { Horizontal = true, Gap = 4f },
+                BuildDots(),
                 HelpDot(MarksTip("rm.marks.help.title", "rm.marks.stepsCaption", HelpText("rm.marks.hint"))),
             }, Gap: 8f),
 
@@ -81,28 +80,40 @@ public sealed partial class Plugin
             new RowElement(new HudElement[]
             {
                 FixedCell(saveW, NeutralButton(() => _loc.T("rm.marks.saveStep"), SaveStep, LabelIn(saveW))),
-                FixedCell(deleteW, NeutralButton(() => _loc.T("rm.marks.deleteStep"), DeleteCurrentStep, LabelIn(deleteW))),
+                FixedCell(deleteW, NeutralButton(() => _loc.T("rm.marks.deleteStep"), DeleteCurrentStep, LabelIn(deleteW),
+                    CanDeleteStep)),
                 FixedCell(exportW, NeutralButtonAt(() => _loc.T("rm.marks.export"), OpenExportWindowAt, LabelIn(exportW))),
             }, Gap: 6f),
         }, Gap: 6f);
     }
 
-    // Step dots: done = accent @45 %, current = accent, the rest = a dark track tone (Text @15 % over the panel).
-    private HudElement[] BuildDots()
+    // "Delete step" is recessed + inert on the Start anchor (Steps[0] can never be deleted) and when there are no real steps.
+    private bool CanDeleteStep() => _currentStep >= 1 && _currentStep < (ActivePreset()?.Steps.Count ?? 0);
+
+    // Real steps (Steps[0] is the blank Start anchor), capped at MaxDots.
+    private int DotCount() => Math.Min(MaxDots, Math.Max(0, (ActivePreset()?.Steps.Count ?? 1) - 1));
+
+    // Step dots: small FIXED 18×6 pills, 4 px apart, hugging the right of the title row. done = accent @45 %, current =
+    // accent, the rest = a dark track tone (Text @15 % over the panel).
+    // ⚠️ Not a horizontal ListElement: its List and Slot containers are column layouts with childForceExpandWidth, which
+    // bubbles flexibleWidth = 1 up — the list took the row's slack and every slot stretched its dot into a long bar
+    // (seen in-game 2026-11-12). A Row of no-else Conditionals instead: each Cond container clamps its flexibleWidth to 0
+    // and a hidden one is deactivated whole (no gap left behind), so the row hugs exactly count × 18 + gaps.
+    private HudElement BuildDots()
     {
         var dots = new HudElement[MaxDots];
         for (int i = 0; i < MaxDots; i++)
         {
             int step = i + 1;   // dot i = real step i + 1 (Steps[0] is the blank Start anchor)
-            dots[i] = new BubbleElement(new SpacerElement(DotW, DotH))
+            dots[i] = new ConditionalElement(() => step <= DotCount(), new BubbleElement(new SpacerElement(DotW, DotH))
             {
                 FillColorFn = () => Fade(step < _currentStep ? Over(Menu.MenuAccent with { A = 0.45f }, PanelColor())
                                        : step == _currentStep ? Menu.MenuAccent
                                        : Over(Menu.MenuText with { A = 0.15f }, PanelColor())),
                 CornerRadius = RoundRadius(DotH), PaddingX = 0f, PaddingY = 0f,
-            };
+            });
         }
-        return dots;
+        return new RowElement(dots, Gap: 4f);
     }
 
     // No active preset: a faint outlined box filling the slot, text centred. (The prototype's DASHED edge isn't drawable —
