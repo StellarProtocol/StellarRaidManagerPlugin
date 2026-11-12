@@ -116,10 +116,10 @@ internal sealed partial class MechanicCalloutTracker
         create = 0;
         try
         {
-            var comp = _piBuffComp?.GetValue(obj);
+            var comp = Ref(_piBuffComp, obj);
             if (comp == null) return false;
             if (!_listsResolved) ResolveLists(comp);
-            var list = _piFullList?.GetValue(comp);
+            var list = Ref(_piFullList, comp);
             if (list == null) return false;
             int n = ListCount(list);
             for (int i = 0; i < n; i++)

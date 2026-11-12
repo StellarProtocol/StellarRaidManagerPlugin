@@ -269,7 +269,25 @@ public sealed partial class Plugin
         if (row.IsHitNow) return _loc.T("rm.mech.now");   // boss release buff just marked the hit (tracker Release.cs)
         if (row.IsPhased) return row.PhaseText;   // two-phase countdown: "Locks 3.1s" → "Dash 1.8s" (Golem Line, localized)
         float r = row.ShownRemainSec;   // hit-offset adjusted (0 = the mechanic lands now)
-        return r < 10f ? $"{r:0.0}s" : $"{(int)r}s";
+        return (r < 10f ? MechTimerText(i, r, true) : MechTimerText(i, (int)r, false))
+               ?? (r < 10f ? $"{r:0.0}s" : $"{(int)r}s");
+    }
+
+    // The countdown text is polled every frame but its characters change ~10×/s: format into a stack buffer (same
+    // "0.0" / integer format, current culture, as the interpolation it replaces) and hand back the slot's previous
+    // string while the characters match — no new string per frame per row. Null = didn't fit → caller formats.
+    // (Two-phase rows keep McRow.PhaseText: a localized template.)
+    private readonly string?[] _mechTimerText = new string?[MechHudSlots];
+
+    private string? MechTimerText(int i, float v, bool tenths)
+    {
+        Span<char> buf = stackalloc char[32];
+        int w;
+        if (!(tenths ? v.TryFormat(buf, out w, "0.0") : ((int)v).TryFormat(buf, out w)) || w + 1 > buf.Length) return null;
+        buf[w++] = 's';
+        var last = _mechTimerText[i];
+        if (last != null && buf[..w].SequenceEqual(last.AsSpan())) return last;
+        return _mechTimerText[i] = new string(buf[..w]);
     }
 
     // ── Test rows ────────────────────────────────────────────────────────────────────────────────────────────

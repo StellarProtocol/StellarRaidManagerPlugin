@@ -21,6 +21,11 @@ internal sealed class McRow
     public long   Arrival;                       // arrival sequence (Order.cs) — set once when the row first appears
     public float  SnapRemain = -1f;              // seconds at SnapTick; -1 = no timer
     public string LocalName = "", OtherNames = "";
+    // What LocalName/OtherNames were last built from (Rows.cs SameNameSource) — skips the per-poll rebuild.
+    internal readonly List<(long Uuid, int Safe, int Count)> NameSrc = new();
+    internal long    NameSrcLocal;
+    internal string? NameSrcLang;
+    internal bool    NameSrcValid;
     // Two-phase countdown (raid Golem Line "Locks N.Ns" → "Dash N.Ns"): the timer runs to the SECOND event; the first
     // phase ends PhaseSplitSec before it. -1 = a plain countdown. Phase1/Phase2 = catalog FORMAT keys ("{0}" = seconds),
     // resolved at display time so a live language switch applies.
@@ -149,7 +154,7 @@ internal sealed partial class MechanicCalloutTracker : IDisposable
 
     private void ResetScene()
     {
-        _names.Clear(); _rows.Clear(); _ents.Clear(); _buffs.Clear(); _firstSeen.Clear();
+        _names.Clear(); _rows.Clear(); _ents.Clear(); _buffs.Clear(); _firstSeen.Clear(); _keyCache.Clear();
         ResetMonsterIds(); _mkSlotByKey.Clear(); _casts.Clear(); _castState.Clear(); _entColor.Clear(); _mapValid = false;
         ResetWide(); ResetOccurrences(); ResetPinballProbe(); ResetPinballBalls(); ResetExpiry(); ResetRing(); ResetFloor(); ResetCrystals(); ResetAimLines(); ResetSpinFan();
         _raidArena = RaidArena.Kind.Unknown; ClearLocalDanger();
@@ -166,6 +171,15 @@ internal sealed partial class MechanicCalloutTracker : IDisposable
 
     // ── Poll ─────────────────────────────────────────────────────────────────────────────────────────────────
     private void Poll()
+    {
+        McPerf.MaybeFlush(_services.Log.Info);   // [MechPerf] line every 10 s while framework diagnostics are on (McPerf.cs)
+        var pm = McPerf.Begin();
+        _pollSeq++;                              // new poll → EntMgr() re-reads the singleton (FastReflection.cs)
+        PollCore();
+        McPerf.End(McPerf.Poll, pm);
+    }
+
+    private void PollCore()
     {
         try
         {
@@ -184,13 +198,16 @@ internal sealed partial class MechanicCalloutTracker : IDisposable
             }
             _scene = def;
             if (!EnsureApi()) { ClearOutput(); return; }
+            ResolveFastPaths();                 // once: typed delegates over the hot reflection reads
             EnsureEffectPatch();
             McBuffEffectPatch.Active = true;    // record PlayEffect ids only while in a supported scene
 
             bool full = (_tickCount++ & 1) == 0 || _ents.Count == 0;
-            if (full) ScanEntities(def);
+            var m = McPerf.Begin();
+            if (full) { ScanEntities(def); McPerf.End(McPerf.Scan, m); m = McPerf.Begin(); }
             SampleCasts();
-            if (full) BuildRows(def);
+            McPerf.End(McPerf.Casts, m);
+            if (full) { m = McPerf.Begin(); BuildRows(def); McPerf.End(McPerf.Rows, m); }
         }
         catch (Exception ex)
         {

@@ -34,12 +34,18 @@ internal sealed partial class MechanicCalloutTracker
         UpdateLocalPos();
         if (def.Kind == SceneKind.Raid) UpdateRaidArena();
         if (!RaidRingGate(def)) TableRows(def);   // raid ring arena: upstream skips the callout/phase rows
+        var m = McPerf.Begin();
         ApplyRules(def);
+        McPerf.End(McPerf.Rules, m);
         Reconcile();
         if (def.Kind == SceneKind.Raid) RaidReleaseCheck();   // boss release buff = hit moment (Release.cs)
         Flatten();
+        m = McPerf.Begin();
         DetectOccurrences(def);                 // new-occurrence events (Occurrence.cs) — alerts / voice
+        McPerf.End(McPerf.Occur, m);
+        m = McPerf.Begin();
         BuildMinimap(def);
+        McPerf.End(McPerf.Minimap, m);
     }
 
     // Adds or merges a row. createMs = server-epoch ms (buff timing); startTick = TickCount64 for locally-observed
@@ -89,14 +95,7 @@ internal sealed partial class MechanicCalloutTracker
             }
             if (dur <= 0 && d.DefaultDurationMs > 0) dur = d.DefaultDurationMs;
 
-            string key = d.RowKey ?? d.Key switch
-            {
-                KeyMode.ByBase    => $"{b.BaseId}",
-                KeyMode.PerTarget => $"{b.BaseId}:t{b.Target}",
-                KeyMode.PerCreate => $"{b.BaseId}:c{b.Create}",
-                KeyMode.PerSource => $"{b.BaseId}:s{b.Fire}",
-                _                 => $"{b.BaseId}:{b.Layer}",
-            };
+            string key = d.RowKey ?? TableKey(d.Key, b);
             var a = Upsert(key, d.Group, d.AppendLayer ? $"{d.Label} x{b.Layer}" : d.Label, d.Color, d.Order, create, dur);
             // Only entities in our scan get named (upstream toMechanicTargets: target must be in its entity map) —
             // a wide-scan carrier (Raid WideScan.cs) yields a row/region without names.
@@ -143,6 +142,7 @@ internal sealed partial class MechanicCalloutTracker
     // font's coverage of ✓/✗ is unverified; the names Text is rich-text, see Plugin.MechanicCalloutsHud.cs; localized).
     private void FinishTargets(McRow row, RowAcc a, long localUuid)
     {
+        if (SameNameSource(row, a, localUuid)) return;   // unchanged since the last poll → keep the strings (no garbage)
         string local = "";
         var others = new List<string>(a.Targets.Count);
         foreach (var t in a.Targets)
@@ -157,6 +157,67 @@ internal sealed partial class MechanicCalloutTracker
         }
         row.LocalName  = local;
         row.OtherNames = string.Join(", ", others);
+        RememberNameSource(row, a, localUuid);
+    }
+
+    // Name-string cache for FinishTargets (raid perf 2026-11-10): the joined names were rebuilt for every row on every
+    // poll. The inputs are (target uuid, safe flag, ×count) + the local uuid + the UI language (the "(safe)"/"(out)"
+    // words are localized); when they match the last build exactly the strings can't differ — EXCEPT a "Player <id>"
+    // fallback that may resolve to a real name later, so a build with any unresolved name is never treated as cached.
+    private bool SameNameSource(McRow row, RowAcc a, long localUuid)
+    {
+        if (!row.NameSrcValid || row.NameSrcLocal != localUuid || row.NameSrc.Count != a.Targets.Count
+            || row.NameSrcLang != McText.Loc?.Language) return false;
+        for (int i = 0; i < a.Targets.Count; i++)
+        {
+            var t = a.Targets[i];
+            if (row.NameSrc[i] != (t.Uuid, t.Safe, CountOf(a, t.Uuid))) return false;
+        }
+        return true;
+    }
+
+    private void RememberNameSource(McRow row, RowAcc a, long localUuid)
+    {
+        row.NameSrc.Clear();
+        bool allNamed = true;
+        foreach (var t in a.Targets)
+        {
+            row.NameSrc.Add((t.Uuid, t.Safe, CountOf(a, t.Uuid)));
+            if (!_names.ContainsKey(t.Uuid)) allNamed = false;
+        }
+        row.NameSrcLocal = localUuid;
+        row.NameSrcLang  = McText.Loc?.Language;
+        row.NameSrcValid = allNamed;
+    }
+
+    private static int CountOf(RowAcc a, long uuid) => a.Counts != null && a.Counts.TryGetValue(uuid, out int k) ? k : 0;
+
+    // Table row keys, cached per (base id, key mode, value): the interpolated key used to be re-formatted for every
+    // mechanic buff on every poll. Cleared with the scene (and capped).
+    private readonly Dictionary<(int BaseId, KeyMode Mode, long V), string> _keyCache = new();
+
+    private string TableKey(KeyMode mode, in McBuff b)
+    {
+        long v = mode switch
+        {
+            KeyMode.ByBase    => 0,
+            KeyMode.PerTarget => b.Target,
+            KeyMode.PerCreate => b.Create,
+            KeyMode.PerSource => b.Fire,
+            _                 => b.Layer,
+        };
+        if (_keyCache.TryGetValue((b.BaseId, mode, v), out var key)) return key;
+        if (_keyCache.Count > 2048) _keyCache.Clear();
+        key = mode switch
+        {
+            KeyMode.ByBase    => $"{b.BaseId}",
+            KeyMode.PerTarget => $"{b.BaseId}:t{b.Target}",
+            KeyMode.PerCreate => $"{b.BaseId}:c{b.Create}",
+            KeyMode.PerSource => $"{b.BaseId}:s{b.Fire}",
+            _                 => $"{b.BaseId}:{b.Layer}",
+        };
+        _keyCache[(b.BaseId, mode, v)] = key;
+        return key;
     }
 
     // (Flatten — header + row lines in the selected list order: MechanicCalloutTracker.Order.cs.)
@@ -195,13 +256,13 @@ internal sealed partial class MechanicCalloutTracker
     }
 
     // ── Names ────────────────────────────────────────────────────────────────────────────────────────────────
-    // Threat-Aggro-Tracking.md ladder: AttrName off the live entity → PartyRoster (roleId) → CombatLookup → self →
-    // "Player <roleId>". Only real names are cached, so a fallback retries on the next poll.
+    // Threat-Aggro-Tracking.md ladder minus the AttrName rung (its GetAttr<object> read can never work — see
+    // Reflection.cs): PartyRoster (roleId) → CombatLookup → self → "Player <roleId>". Only real names are cached, so a
+    // fallback retries on the next poll.
     private string NameFor(long uuid)
     {
         if (_names.TryGetValue(uuid, out var cached)) return cached;
-        string n = ReadAttrName(uuid);
-        if (n.Length == 0) n = PartyName(uuid >> 16);
+        string n = PartyName(uuid >> 16);
         if (n.Length == 0)
         {
             try { n = _services.CombatLookup.GetEntityName(new EntityId(uuid)) ?? ""; } catch { n = ""; }

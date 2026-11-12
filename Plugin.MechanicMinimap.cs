@@ -174,6 +174,7 @@ public sealed partial class Plugin
         long now = Environment.TickCount64;
         if (now - _mechMapShownAt > 250 || now - _mechMapLastTick < MechMapFrameMs) return;
         _mechMapLastTick = now;
+        var pm = McPerf.Begin();
         try
         {
             var live = _mechTracker.Map;
@@ -182,11 +183,14 @@ public sealed partial class Plugin
             if (moved || _mechTracker.MapVersion != _mechMapPaintedVersion) PaintMechMap(live, _mechTracker.MapVersion);
         }
         catch (Exception ex) { LogMapErrOnce(ex); }
+        finally { McPerf.End(McPerf.MapFrame, pm); }
     }
 
     private void PaintMechMap(MinimapView v, int version)
     {
+        var pm = McPerf.Begin();
         _mechMapPainter.Paint(v);
+        McPerf.End(McPerf.MapPaint, pm);
         _mechMapPaintedVersion = version;
     }
 
