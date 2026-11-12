@@ -25,9 +25,9 @@
   </ItemGroup>
   <ItemGroup>
     <!-- i18n P2: consumes IPluginServices.Localization (framework 2.1.0). -->
-    <PackageReference Include="Stellar.Abstractions" Version="2.19.1" />
-    <PackageReference Include="Stellar.PluginContracts" Version="2.19.1" />
-    <PackageReference Include="Stellar.Plugin.InteropRefs" Version="2.19.1" />
+    <PackageReference Include="Stellar.Abstractions" Version="2.30.0" />
+    <PackageReference Include="Stellar.PluginContracts" Version="2.30.0" />
+    <PackageReference Include="Stellar.Plugin.InteropRefs" Version="2.30.0" />
   </ItemGroup>
   <!-- Local overrides: deploy target, game paths, and (while unreleased) a local Stellar.Abstractions
        reference that carries InputElement.SingleLine — all in Local.props (gitignored). Imported AFTER the
