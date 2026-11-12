@@ -13,7 +13,11 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources/raid-manager-icon.png" LogicalName="Stellar.RaidManager.raid-manager-icon.png" />
-    <!-- Rename edit/save chip icons, copied from StellarWardrobeLoadout/Icons (explicit LogicalName = stable manifest name). -->
+    <!-- House-style icon art: flat WHITE glyphs pre-drawn per size, Resources/icons/<name>-<px>.png (raidmanager, marks,
+         callouts, countdown, share x 16/24/32/64/128) + the recessed dropdown chevron. The code discovers the sizes from
+         these names (Plugin.Style.Blocks.cs IconPng), so swapping in the final art = replacing / adding files here. -->
+    <EmbeddedResource Include="Resources/icons/*.png" LogicalName="Stellar.RaidManager.icons.%(Filename)%(Extension)" />
+    <!-- Step-comment pencil / check icons, copied from StellarWardrobeLoadout/Icons (explicit LogicalName = stable manifest name). -->
     <EmbeddedResource Include="Icons/edit.png" LogicalName="Stellar.RaidManager.Icons.edit.png" />
     <EmbeddedResource Include="Icons/save.png" LogicalName="Stellar.RaidManager.Icons.save.png" />
     <EmbeddedResource Include="Lang/en.json" LogicalName="Stellar.RaidManager.Lang.en.json" />
