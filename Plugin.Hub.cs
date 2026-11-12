@@ -12,7 +12,9 @@ namespace Stellar.RaidManager;
 // Window id stays "stellar-raid-manager.settings" (the old single settings window), so a saved position carries over.
 public sealed partial class Plugin
 {
-    private const float HubWidth = 400f;
+    // 480 (was 400, R18): the card status column (480 − 24 pad − 40 tile − 24 › − 4 × 8 gaps = 360) holds the longest
+    // status in any locale — "Listahan naka-off · Minimap naka-off · Alerto naka-off" (fil, ≈340 px) cut at 400.
+    private const float HubWidth = 480f;
     private const float HubCardGap = 8f;
     private const int   HubToolCount = 3;
 

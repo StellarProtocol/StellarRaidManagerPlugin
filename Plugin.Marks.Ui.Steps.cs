@@ -30,7 +30,10 @@ public sealed partial class Plugin
     private HudElement BuildStepNavigator()
     {
         float third = MathF.Floor((MarksInnerW - 12f) / 3f);
-        const float deleteW = 100f, exportW = 84f;
+        // R10: Delete step / Export are fixed cells sized to the longest locale ("Hapus langkah" (id) ≈94 px bold-13,
+        // "書き出し" (ja) ≈56); Save takes the rest — 292 at the 560 window, label 268 ≥ "I-save ang mark bilang bagong
+        // hakbang" (fil, ≈256) and "Simpan mark sebagai langkah baru" (id, ≈227). At 480 all three cut in fil / id.
+        const float deleteW = 124f, exportW = 88f;
         float saveW = MarksInnerW - deleteW - exportW - 12f;
         return new ColumnElement(new HudElement[]
         {

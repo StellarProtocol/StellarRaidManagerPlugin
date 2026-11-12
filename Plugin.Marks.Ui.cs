@@ -6,7 +6,7 @@ namespace Stellar.RaidManager;
 
 // ── Punctuate Mark Presets — window (house redesign, approved 2026-11-12) ──────────────────────────────────────────
 //
-// 480 wide, CONSTANT height in every state (rule 14): ToolHeader ("“X” active · N marks on the field"), the PRESETS
+// 560 wide (was 480 — the fil / id step pills cut, R18), CONSTANT height in every state (rule 14): ToolHeader ("“X” active · N marks on the field"), the PRESETS
 // panel (a 5-row list that scrolls past 5 — cap 24 unchanged — + the create row), the STEPS panel (always present: the
 // active preset's step navigator, or the "No preset active" empty state, or the delete confirm — all in one fixed slot,
 // Plugin.Marks.Ui.Steps.cs), and a fixed-height footer feedback line (Plugin.Marks.Edit.cs).
@@ -18,14 +18,14 @@ namespace Stellar.RaidManager;
 // State/logic: Plugin.Marks.cs, .Rename.cs, .Edit.cs; share code: .Share.cs / .ImportWindow.cs / .ExportWindow.cs.
 public sealed partial class Plugin
 {
-    private const float MarksWidth   = 480f;
+    private const float MarksWidth   = 560f;
     private const float MarksInnerW  = MarksWidth - 24f - 20f;   // panel content width: window pad 2×12, panel pad 2×10
     private const int   ListRows     = 5;
     private const float RowTileH     = 26f;
     private const float RowPitch     = 28f;                       // 26 px tile + 2 px gap (rule 15)
     private const float RowPillW     = 72f;
     private const float RowPillPadX  = 6f;
-    private const float StepCountW   = 64f;
+    private const float StepCountW   = 120f;                      // "24 (na) hakbang" (fil, ≈115 px) — 64 cut it
     private const float CreatePillLabelW = 64f;
 
     private void RegisterMarksWindow()

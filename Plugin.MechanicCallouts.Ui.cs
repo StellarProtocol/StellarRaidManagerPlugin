@@ -7,8 +7,9 @@ namespace Stellar.RaidManager;
 // ── Mechanic Callouts — the settings window (house redesign, approved 2026-11-12) ──────────────────────────────────
 //
 // 800 wide, two balanced, top-aligned columns (rule 17), CONSTANT height: left = CALLOUT LIST + ON-ME ALERT, right =
-// MINIMAP. Header = ToolHeader (status "List on · Minimap on · Alert off — move them in the HUD layout editor", the
-// SAME builder as the hub card) + a Neutral "Test alert" pill (reachable even with the alert off). Toggles are 64×24
+// MINIMAP. Header = ToolHeader (status "List on · Minimap on · Alert off", the SAME builder as the hub card) + a
+// Neutral "Test alert" pill (reachable even with the alert off) + a "?" holding the "move them in the HUD layout
+// editor" note. Toggles are 64×24
 // ON/OFF chips, sliders round-knob, dropdowns Pill. A section's sub-options are RECESSED — shown, dimmed, not clickable —
 // while its main switch is off (they used to disappear and the window jumped). Every row ends in "?" (help popover).
 // Settings, config keys (mech_*), defaults and behaviour are unchanged; the setters are the ones the old rows used.
@@ -45,8 +46,13 @@ public sealed partial class Plugin
 
         return new ColumnElement(new HudElement[]
         {
-            ToolHeader("callouts", () => _loc.T("rm.mech.title"), MechHeaderStatus, () => _mechWindow.SetVisible(false),
-                trailing: NeutralButton(() => _loc.T("rm.mech.alert.test"), TestOnMeAlert, MechTestAlertW)),
+            ToolHeader("callouts", () => _loc.T("rm.mech.title"), MechStatus, () => _mechWindow.SetVisible(false),
+                trailing: new RowElement(new HudElement[]
+                {
+                    NeutralButton(() => _loc.T("rm.mech.alert.test"), TestOnMeAlert, MechTestAlertW),
+                    // "Where do the overlays go?" — the HUD layout editor note (moved out of the status line).
+                    HelpDot(MechTip("rm.mech.help.layoutTitle", "rm.mech.title", "rm.mech.help.layout")),
+                }, Gap: RowGap)),
             new RowElement(new HudElement[]
             {
                 TopColumn(MechColW, 8f,
@@ -167,11 +173,12 @@ public sealed partial class Plugin
     }
 
     // ── status (window header AND hub card) ───────────────────────────────────────────────────────────────────────
-    // "List on · Minimap on · Alert off" (+ " — move them in the HUD layout editor" in the header), re-made only when a
-    // switch or the language changes.
+    // "List on · Minimap on · Alert off", re-made only when a switch or the language changes. The header used to append
+    // " — move them in the HUD layout editor", but that ellipsized in fil / id (in-game 2026-11-12); the sentence now
+    // lives in the header "?" next to Test alert, so header and hub card show the same string.
     private int _mechStatusKey = -1;
     private string? _mechStatusLang;
-    private string _mechStatus = string.Empty, _mechHeaderStatus = string.Empty;
+    private string _mechStatus = string.Empty;
 
     private void RefreshMechStatus()
     {
@@ -182,9 +189,7 @@ public sealed partial class Plugin
         _mechStatus = _loc.T(_mechEnabled ? "rm.mech.status.listOn" : "rm.mech.status.listOff")
             + " · " + _loc.T(_mechMapEnabled ? "rm.mech.status.mapOn" : "rm.mech.status.mapOff")
             + " · " + _loc.T(_alertOn ? "rm.mech.status.alertOn" : "rm.mech.status.alertOff");
-        _mechHeaderStatus = _loc.TFormat("rm.mech.status.header", _mechStatus);
     }
 
-    private string MechStatus()       { RefreshMechStatus(); return _mechStatus; }
-    private string MechHeaderStatus() { RefreshMechStatus(); return _mechHeaderStatus; }
+    private string MechStatus() { RefreshMechStatus(); return _mechStatus; }
 }
