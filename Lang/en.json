@@ -18,6 +18,7 @@
   "rm.ct.title": "Countdown & Raid Warning",
   "rm.hub.status": "{0} tools",
   "rm.hud.countdown": "COUNTDOWN",
+  "rm.hud.sample.rw": "Stack now!",
   "rm.hud.title": "Raid Countdown",
   "rm.marks.activate": "Activate",
   "rm.marks.activated": "Activated \"{0}\".",
