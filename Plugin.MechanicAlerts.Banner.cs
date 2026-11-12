@@ -91,7 +91,7 @@ public sealed partial class Plugin
             {
                 Draggable = true, EditModeDragOnly = true, Closable = false, StartVisible = false, Passive = true,
                 Surface = SurfaceStyle.HudOverlay,
-                ShouldRender = () => _alertOn && MechInWorld
+                ShouldRender = () => (_alertOn || AlertTestRunning) && MechInWorld
                                   && (_services.ClientState.UiState & GameUIState.Blocking) == 0
                                   && (_services.Windows.IsLayoutEditing || AnyBanner()),
             },

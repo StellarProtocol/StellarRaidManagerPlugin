@@ -1,3 +1,4 @@
+using System;
 using Stellar.Abstractions.Domain;
 using Stellar.Abstractions.Services;
 
@@ -5,64 +6,42 @@ namespace Stellar.RaidManager;
 
 // ── Punctuate Mark Presets — export (copy) window ─────────────────────────────────────────────────────────────────
 //
-// Opened by the "Export Code" button in the Mark Presets step panel, anchored just below it (above if no room) — the
-// mirror of the import window (Plugin.Marks.ImportWindow.cs, which also owns the shared AnchorBelowButton /
-// TickPopupReposition helpers). Opening GENERATES the code for the active preset (ExportActivePreset,
-// Plugin.Marks.Share.cs); if encoding fails the export-failed status shows in the marks window and this window does
-// not open.
+// Opened by the "Export" pill in the STEPS panel, centred on that pill and in front (WindowCenterer.OpenCentred, house
+// redesign 2026-11-12) — the mirror of the import window (Plugin.Marks.ImportWindow.cs, which also owns CentreOfButton).
+// Opening GENERATES the code for the active preset (ExportActivePreset, Plugin.Marks.Share.cs); if encoding fails the
+// export-failed status shows in the marks window's footer and this window does not open.
 //
-// The full code sits in a READ-ONLY TextAreaElement: the user can select/copy it by hand (Ctrl+C) but not edit it,
-// and the Copy button puts the whole thing on the clipboard. Copy feedback shows in this window's status line (and in
-// the marks window's status + NoticeTip, as before).
+// House header (32 px "share" tile, "Share “X”", "N steps · N characters"), the full code in a READ-ONLY TextAreaElement
+// (selectable / copyable by hand, not editable), then [footer "✓ Copied" | Copy].
 //
 // Staleness: the code is a snapshot. Everything that would change it (switching / deactivating / deleting / renaming
 // the preset, saving or deleting a step, editing a comment) calls ClearExportCode(), which also CLOSES this window —
-// the user re-opens it to get a fresh code. Closing (rather than silently regenerating) keeps one rule everywhere:
-// this window only ever shows a code for the preset it was opened on.
+// the user re-opens it to get a fresh code. This window only ever shows a code for the preset it was opened on.
 public sealed partial class Plugin
 {
     private IWindowControl _exportWindow = null!;
+    private WindowCenterer _exportCenter = null!;
     private string _exportStatus = "";
     private bool _exportStatusOk = true;
-
-    private const float ExportWidth = 420f;          // = DefaultRect width
-    private const float ExportHeightEstimate = 240f; // auto-height window; used until it has been mounted once
-    private WindowRect _exportRect;                  // anchored rect, re-applied for a few frames after opening
-    private int _exportRepositionTicks;
 
     private void RegisterExportWindow()
     {
         _exportWindow = _services.Windows.Register(new WindowRegistration(
-            Spec: new WindowSpec(
-                Id: "stellar-raid-manager.marks.export",
-                Title: _loc.T("rm.marks.exportTitle"),
-                // Constant default rect (KB rule) — same spot as the import window; it is re-anchored on every open.
-                DefaultRect: new WindowRect(560f, 340f, ExportWidth, 0f),
-                Category: WindowCategory.Tools,
-                Style: WindowPanelStyle.GlassMenu)
-            {
-                Draggable = true, Closable = true, StartVisible = false,
-                // Same gate as the marks window: world only, hidden on loading screens.
-                ShouldRender = () => _services.ClientState.Phase == GamePhase.World
-                                     && (_services.ClientState.UiState & GameUIState.Loading) == 0,
-            },
+            Spec: ToolSpec("stellar-raid-manager.marks.export", "rm.marks.exportTitle", new WindowRect(560f, 340f, PopupWidth, 0f)),
             Root: BuildExportRoot(),
             OnClose: () => _exportWindow.SetVisible(false)));
+        _exportCenter = new WindowCenterer(_services.Framework, _exportWindow, WindowCenterer.CanvasCentre);
     }
 
-    // "Export Code" → OnClickWithRect (`btn` in screen pixels). Re-clicking while open regenerates the code for the
-    // (same, still-active) preset and re-anchors. Both windows are WindowCategory.Tools and this one opens from hidden
-    // (fresh ZSeq) → no BringToFront (Rule 5).
+    // "Export" → OnClickWithRect (`btn` in screen pixels). Re-clicking while open regenerates the code for the (same,
+    // still-active) preset and re-centres it.
     private void OpenExportWindowAt(WindowRect btn)
     {
         ExportActivePreset();
-        if (!HasExportCode()) return;   // no active preset, or encode failed (status already in the marks window)
+        if (!HasExportCode()) return;   // no active preset, or encode failed (status already in the marks footer)
 
         SetExportStatus("", ok: true);
-        _exportRect = AnchorBelowButton(btn, ExportWidth, ExportHeightEstimate, _exportWindow.Rect.Height);
-        _exportWindow.SetVisible(true);
-        _exportWindow.SetRect(_exportRect);
-        _exportRepositionTicks = 4;     // first-open mount applies DefaultRect after SetRect (see ImportWindow.cs)
+        _exportCenter.OpenCentred(CentreOfButton(btn));
         _exportWindow.MarkDirty();
     }
 
@@ -73,7 +52,7 @@ public sealed partial class Plugin
 
     private void SetExportStatus(string text, bool ok)
     {
-        _exportStatus = text;
+        _exportStatus = ok && text.Length > 0 ? "✓ " + text : text;
         _exportStatusOk = ok;
         _exportWindow?.MarkDirty();
     }
@@ -81,33 +60,34 @@ public sealed partial class Plugin
     private string ExportPresetName()
         => _exportPresetIdx >= 0 && _exportPresetIdx < _presets.Count ? _presets[_exportPresetIdx].Name ?? "" : "";
 
-    private HudElement BuildExportRoot()
-        => new ColumnElement(new HudElement[]
+    // "Share “X”" + "5 steps · 412 characters" — re-made only when the code, the name or the language changes.
+    private string? _shareCode, _shareName, _shareLang;
+    private string _shareTitle = "", _shareStatus = "";
+
+    private void RefreshShareText()
+    {
+        string name = ExportPresetName();
+        var lang = _loc.Language;
+        if (ReferenceEquals(_exportCode, _shareCode) && ReferenceEquals(name, _shareName)
+            && string.Equals(lang, _shareLang, StringComparison.Ordinal)) return;
+        _shareCode = _exportCode; _shareName = name; _shareLang = lang;
+        int steps = _exportPresetIdx >= 0 && _exportPresetIdx < _presets.Count ? _presets[_exportPresetIdx].Steps.Count - 1 : 0;
+        _shareTitle = _loc.TFormat("rm.marks.shareTitle", name);
+        _shareStatus = _loc.TFormat("rm.marks.shareStatus", steps, _exportCode.Length);
+    }
+
+    private HudElement BuildExportRoot() => new ColumnElement(new HudElement[]
+    {
+        ToolHeader("share", () => { RefreshShareText(); return _shareTitle; }, () => { RefreshShareText(); return _shareStatus; },
+            () => _exportWindow.SetVisible(false), SmallIconSize, SmallGlyph),
+        // Same sizing as the import text area. ReadOnly: selectable / copyable, not editable.
+        new TextAreaElement(Get: () => _exportCode, OnChange: _ => { }, Width: PopupInnerW) { Lines = 5, ReadOnly = true },
+        new RowElement(new HudElement[]
         {
-            new TextElement(() => _loc.TFormat("rm.marks.exportLabel", ExportPresetName()), Emphasis: true),
-            new RowElement(new HudElement[]
-            {
-                // Same sizing as the import text area (Weight 1 + Width 396 = the 420 window's content width).
-                // ReadOnly: selectable/copyable, not editable — OnChange is never meaningfully called.
-                new CellElement(new TextAreaElement(
-                    Get:      () => _exportCode,
-                    OnChange: _ => { },
-                    Width:    396f) { Lines = 5, ReadOnly = true }, Weight: 1f),
-            }, Gap: 4f),
-            new RowElement(new HudElement[]
-            {
-                new CellElement(new TextElement(
-                    () => _loc.TFormat("rm.marks.codeLength", _exportCode.Length),
-                    Color: () => (ColorRgba?)_services.Theme.Colors.TextMuted), Weight: 1f),
-                new CellElement(new ButtonElement(() => _loc.T("rm.marks.copy"), OnClick: CopyExportCode),
-                    Width: 90f),
-            }, Gap: 4f),
-            new ConditionalElement(() => _exportStatus.Length > 0,
-                new TextElement(() => _exportStatus,
-                    // Explicit color on BOTH branches — a null Color lambda means "leave untouched", so an error tint
-                    // would otherwise stick after a later success (WindowBuilder-Patterns.md, sticky color).
-                    Color: () => _exportStatusOk
-                        ? (ColorRgba?)_services.Theme.Colors.HudAccent
-                        : (ColorRgba?)_services.Theme.Colors.Warning)),
-        }, Gap: 6f);
+            new CellElement(FixedLine(() => _exportStatus,
+                () => _exportStatusOk ? SuccessText()
+                                      : CautionText(), bold: true), Weight: 1f),
+            PrimaryButton(() => _loc.T("rm.marks.copy"), CopyExportCode, PopupPillLabelW),
+        }, Gap: 6f),
+    }, Gap: 10f);
 }

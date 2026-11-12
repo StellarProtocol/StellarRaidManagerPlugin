@@ -23,19 +23,12 @@ public sealed partial class Plugin
 
     private int MechMapUserQuarters => MechMapRotQuarters[_mechMapRotation];
 
-    private HudElement MechMapRotationRow() => new RowElement(new HudElement[]
+    // ("Rotation" dropdown in the Mechanic Callouts window, Plugin.MechanicCallouts.Ui.cs.)
+    private void SetMechMapRotation(int v)
     {
-        new TextElement(() => _loc.T("rm.mech.map.rotation")),
-        new DropdownElement(
-            Selected: () => _mechMapRotation,
-            Options:  () => Array.ConvertAll(MechMapRotKeys, _loc.T),
-            OnSelect: v =>
-            {
-                _mechMapRotation = Math.Clamp(v, 0, MechMapRotQuarters.Length - 1);
-                _cfg.Set<int>("mech_map_rotation", _mechMapRotation);
-                _cfg.Save();
-                ApplyMechMapOptions();   // painter quarters + forced repaint (re-bake via the layer key)
-            },
-            Width: 220f),
-    }, Gap: 6f);
+        _mechMapRotation = Math.Clamp(v, 0, MechMapRotQuarters.Length - 1);
+        _cfg.Set<int>("mech_map_rotation", _mechMapRotation);
+        _cfg.Save();
+        ApplyMechMapOptions();   // painter quarters + forced repaint (re-bake via the layer key)
+    }
 }

@@ -12,7 +12,7 @@ public sealed partial class Plugin : IStellarPlugin
     private readonly IPluginServices _services;
     private readonly ILocalization _loc;
     private readonly IWindowControl _hud;
-    private readonly IWindowControl _settingsWindow;
+    private IWindowControl _hubWindow = null!;   // Plugin.Hub.cs
     private readonly IDisposable _launcherEntry;
     private readonly IConfigSection _cfg;
 
@@ -38,6 +38,7 @@ public sealed partial class Plugin : IStellarPlugin
 
     private readonly Action<ChatMessage> _onMessage;
     private readonly Action<float> _onUpdate;
+    private readonly Action _onLogout;
 
     public Plugin(IPluginServices services)
     {
@@ -59,6 +60,7 @@ public sealed partial class Plugin : IStellarPlugin
 
         _onMessage = OnMessage;
         _onUpdate  = OnUpdate;
+        _onLogout  = OnLogoutCloseWindows;
 
         _services.Chat.MessageReceived += _onMessage;
         _services.Framework.Update += _onUpdate;
@@ -81,19 +83,18 @@ public sealed partial class Plugin : IStellarPlugin
             },
             BuildHudRoot()));
 
-        _settingsWindow = _services.Windows.Register(new WindowRegistration(
-            Spec: new WindowSpec(
-                Id: "stellar-raid-manager.settings",
-                Title: _loc.T("rm.title"),
-                DefaultRect: new WindowRect(810f, 480f, 300f, 0f),
-                Category: WindowCategory.Tools,
-                Style: WindowPanelStyle.GlassMenu)
-            { Draggable = true, Closable = true, StartVisible = false,
-              // Settings window: available whenever the world is active and not on a loading screen.
-              ShouldRender = () => _services.ClientState.Phase == GamePhase.World
-                                   && (_services.ClientState.UiState & GameUIState.Loading) == 0 },
-            Root: BuildSettingsRoot(),
-            OnClose: () => _settingsWindow.SetVisible(false)));
+        // Tool windows (house style, Plugin.Style*.cs). The help popover first: the prebuilt windows' "?" poll it.
+        RegisterHelpWindow();     // Plugin.Help.cs
+        RegisterCtWindow();       // Plugin.Countdown.Ui.cs — Countdown & Raid Warning
+
+        // Punctuate Mark Presets — save/reload dungeon marker layouts (Plugin.Marks*.cs).
+        InitMarks();
+
+        // Mechanic Callouts — who got which boss mechanic: list, minimap, on-me alert (Plugin.MechanicCallouts.cs).
+        InitMechanicCallouts();
+
+        RegisterHubWindow();      // Plugin.Hub.cs — the launcher tile's window, one card per tool
+        CreateHubCenterers();
 
         // Title stays the fixed literal "Raid Manager" — the stable pin-identity key (ILauncher.cs:49-50) —
         // so a pinned tile survives a language change; TitleProvider carries the live-localized display.
@@ -101,29 +102,55 @@ public sealed partial class Plugin : IStellarPlugin
             Title: "Raid Manager",
             IconPng: LoadIconPng(),
             IconKey: null,
-            OnOpen: () => _settingsWindow.SetVisible(true))
+            OnOpen: OpenHub)
         { Group = LauncherGroup.Plugin,
           // Re-localize the tile DISPLAY on a language change; Title above never changes (pin identity).
           TitleProvider = () => _loc.T("rm.title"),
           // Launcher tile: only surface the plugin while in-world.
           ShouldShow = () => _services.ClientState.Phase == GamePhase.World });
 
-        // Punctuate Mark Presets — save/reload dungeon marker layouts (Plugin.Marks*.cs).
-        InitMarks();
-
-        // Mechanic Callouts — who got which boss mechanic: list, minimap, on-me alert (Plugin.MechanicCallouts.cs).
-        InitMechanicCallouts();
+        // In-world only + closed on logout (Stellar-Design-Language §5): the phase stays World through the logout
+        // transition, so ShouldRender alone would leave the tool windows up on the loading screen. Synchronous — Update
+        // is world-gated, so a Post could run too late.
+        _services.ClientState.Logout += _onLogout;
     }
 
     public void Dispose()
     {
         _services.Chat.MessageReceived -= _onMessage;
         _services.Framework.Update -= _onUpdate;
+        try { _services.ClientState.Logout -= _onLogout; } catch { }
+        StopCenterers();
         DisposeMarks();
         DisposeMechanicCallouts();
         _launcherEntry.Dispose();
-        _settingsWindow.Remove();
+        _hubWindow.Remove();
+        _ctWindow.Remove();
+        _helpWindow.Remove();
         _hud.Remove();
+    }
+
+    private void StopCenterers()
+    {
+        _ctCenter?.Stop(); _marksCenter?.Stop(); _mechCenter?.Stop();
+        _importCenter?.Stop(); _exportCenter?.Stop();
+    }
+
+    // Logout → close every tool window so none lingers through the logout transition or reappears at the next login.
+    private void OnLogoutCloseWindows()
+    {
+        try
+        {
+            StopCenterers();
+            CloseHelp();
+            _hubWindow.SetVisible(false);
+            _ctWindow.SetVisible(false);
+            _marksWindow.SetVisible(false);
+            _importWindow.SetVisible(false);
+            _exportWindow.SetVisible(false);
+            _mechWindow.SetVisible(false);
+        }
+        catch (Exception ex) { _services.Log.Warning($"[RaidManager] logout window close failed: {ex.Message}"); }
     }
 
     private void SetSize(string size)
@@ -132,7 +159,7 @@ public sealed partial class Plugin : IStellarPlugin
         _cfg.Set<string>("size", size);
         _cfg.Save();
         _hud.MarkDirty();
-        _settingsWindow.MarkDirty();
+        _ctWindow.MarkDirty();
     }
 
     private void SetRwSize(string size)
@@ -141,7 +168,7 @@ public sealed partial class Plugin : IStellarPlugin
         _cfg.Set<string>("rw_size", size);
         _cfg.Save();
         _hud.MarkDirty();
-        _settingsWindow.MarkDirty();
+        _ctWindow.MarkDirty();
     }
 
     private static float SizeToMult(string? size) => size switch
@@ -157,16 +184,6 @@ public sealed partial class Plugin : IStellarPlugin
     private float Scale   => _sizeMult;
     private float RwScale => _rwSizeMult;
 
-    private static byte[]? LoadIconPng()
-    {
-        try
-        {
-            using var s = typeof(Plugin).Assembly.GetManifestResourceStream("Stellar.RaidManager.raid-manager-icon.png");
-            if (s == null) return null;
-            using var ms = new System.IO.MemoryStream();
-            s.CopyTo(ms);
-            return ms.ToArray();
-        }
-        catch { return null; }
-    }
+    // Launcher tile art — stays the old raid-manager-icon.png until the new "raidmanager" art is chosen.
+    private static byte[]? LoadIconPng() => CachedPng("raid-manager-icon.png");
 }

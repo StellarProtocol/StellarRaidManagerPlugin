@@ -4,10 +4,10 @@ namespace Stellar.RaidManager;
 //
 // Each real step (1..N) of a preset can carry an optional free-text note (MarkStep.Comment, e.g. "P2 — stack west").
 // Same label↔input swap as the preset rename (Plugin.Marks.Rename.cs): the step panel shows the CURRENT step's
-// comment as a label; the pencil chip turns it into an input, the check chip (or Enter) commits. The row itself is
-// built in Plugin.Marks.Ui.cs; this partial owns the edit state + commit. The blank Start anchor (Steps[0]) still
+// comment as a label; the round pencil button turns it into an input, the check button (or Enter) commits. The row is
+// built in Plugin.Marks.Ui.Steps.cs; this partial owns the edit state + commit. The blank Start anchor (Steps[0]) still
 // shows the row (so the window height doesn't jump crossing Start↔Step 1) but read-only: CurrentStepComment() is ""
-// there, the pencil is disabled, and EnterStepCommentEdit refuses — so it can't be annotated.
+// there, the pencil is recessed, and EnterStepCommentEdit refuses — so it can't be annotated.
 //
 // Persistence rides on the existing presets JSON: Comment is a plain public prop on MarkStep, so System.Text.Json
 // writes it with the rest of the step. Configs saved before this field existed simply lack it → the initializer's
@@ -20,6 +20,7 @@ public sealed partial class Plugin
     // InputElement submits on ENTER ONLY — the check chip has to read the typed text without an Enter.
     private int _commentEditStep = -1;
     private string _commentBuffer = "";
+    private int _commentFocusSeq;   // bumped on edit → the comment field takes the focus (InputElement.FocusRequest)
 
     // True only while the CURRENTLY SHOWN step is the one being edited (the cursor moving cancels, but belt-and-braces).
     private bool IsEditingStepComment() => _commentEditStep >= 1 && _commentEditStep == _currentStep;
@@ -37,6 +38,7 @@ public sealed partial class Plugin
         if (p == null || _currentStep < 1 || _currentStep >= p.Steps.Count) return;   // Start anchor isn't annotatable
         _commentEditStep = _currentStep;
         _commentBuffer = p.Steps[_currentStep].Comment ?? "";
+        _commentFocusSeq++;
         _marksWindow?.MarkDirty();
     }
 
@@ -50,7 +52,7 @@ public sealed partial class Plugin
             p.Steps[i].Comment = _commentBuffer?.Trim() ?? "";
             ClearExportCode();   // comment changed → any exported code is stale
             SavePresetsToConfig();
-            _marksStatus = _loc.TFormat("rm.marks.commentSaved", i);   // real step number == index (Steps[0] = anchor)
+            SetMarksStatus(_loc.TFormat("rm.marks.commentSaved", i));   // real step number == index (Steps[0] = anchor)
             _services.Log.Info($"[MarkPresets] '{p.Name}' step {i} comment set ({p.Steps[i].Comment.Length} chars)");
         }
         CancelStepCommentEdit();
