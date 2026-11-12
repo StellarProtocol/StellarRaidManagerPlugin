@@ -119,53 +119,6 @@ public sealed partial class Plugin
         _importWindow?.Remove();
         _exportWindow?.Remove();
     }
-
-    // ── NoticeTip feedback (subtle, on-screen — mirrors the window status line) ────────────────────────────────────
-    // These fire often (Activate + every Prev/Next/Reset), so keep them short and SILENT — deliberately NOT the
-    // Special banner + DungeonVictory sound the /rw path uses. Fully guarded: a notice failure must never break
-    // navigation or crash the game.
-    private void ShowMarksNotice(string content)
-    {
-        try
-        {
-            _services.NoticeTips
-                .Create(NoticeTipType.PopTip)       // neutral center pop-tip (not the /rw Special banner)
-                .WithContent(content)
-                .WithAudio(NoticeTipAudio.Silent)   // silent — nav tips fire too often to sound
-                .WithDuration(2.0f)
-                .Show();
-        }
-        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] notice tip failed: {ex.Message}"); }
-    }
-
-    // Error variant — used when a step hotkey is pressed with no preset active (a rare misuse, so a short center
-    // pop-tip with a light error cue is warranted). Still fully guarded.
-    private void ShowMarksError(string content)
-    {
-        try
-        {
-            _services.NoticeTips
-                .Create(NoticeTipType.PopTip)       // same neutral pop-tip; audible error cue kept below
-                .WithContent(content)
-                .WithAudio(NoticeTipAudio.ErrorTip)
-                .WithDuration(2.5f)
-                .Show();
-        }
-        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] notice tip failed: {ex.Message}"); }
-    }
-
-    // Localized "resulting step" line for a nav op. Step 0 (the blank anchor) reads "Start"; a real step k reads
-    // "Step k / N" where N == the real step count (Steps[0] is the anchor, so N = Steps.Count - 1).
-    // A non-empty step comment is appended (notice.stepComment) so it shows mid-fight from the hotkeys too.
-    private string MarksStepNotice(MarkPreset p)
-    {
-        if (_currentStep <= 0) return _loc.TFormat("rm.marks.notice.start", p.Name);
-        string c = _currentStep < p.Steps.Count ? p.Steps[_currentStep].Comment ?? "" : "";
-        return c.Length > 0
-            ? _loc.TFormat("rm.marks.notice.stepComment", p.Name, _currentStep, p.Steps.Count - 1, c)
-            : _loc.TFormat("rm.marks.notice.step", p.Name, _currentStep, p.Steps.Count - 1);
-    }
-
     // Pumped from OnUpdate (Plugin.Logic.cs). Drains the load queue one mark per frame — Framework.Update runs on
     // the main thread before LateUpdate, which is exactly the timing the indicatorPos_ write needs.
     private void TickMarks(float deltaTime)
@@ -389,51 +342,5 @@ public sealed partial class Plugin
         _marksStatus = _loc.TFormat("rm.marks.applying", i, step.Marks.Count);   // real step number == index
         _marksWindow?.MarkDirty();
         _services.Log.Info($"[MarkPresets] applying '{p.Name}' step {i} ({step.Marks.Count} marks)");
-    }
-
-    // ── Persistence (presets JSON + active-preset name, both in the 'marks' config section) ───────────────────────
-    private void LoadPresetsFromConfig()
-    {
-        _presets.Clear();
-        _activeIndex = -1;
-        _currentStep = -1;
-        try
-        {
-            string json = _marksCfg.Get<string>("presets", "") ?? "";
-            if (json.Length > 0)
-            {
-                var list = JsonSerializer.Deserialize<List<MarkPreset>>(json);
-                if (list != null) _presets.AddRange(list);
-            }
-
-            // Migration: every preset must own a blank Step 0 anchor. Old presets (saved before this feature) have
-            // real layouts starting at Steps[0] — prepend an empty step so their first layout isn't mistaken for it.
-            foreach (var p in _presets)
-                if (p.Steps.Count == 0 || p.Steps[0].Marks.Count > 0)
-                    p.Steps.Insert(0, new MarkStep());
-
-            // A step with an explicit JSON null comment would otherwise carry null past the initializer.
-            foreach (var p in _presets)
-                foreach (var st in p.Steps)
-                    st.Comment ??= "";
-
-            // Resolve the persisted active name back to an index; the cursor lands on Step 0 (the blank anchor).
-            string active = _marksCfg.Get<string>("active", "") ?? "";
-            if (active.Length > 0)
-                _activeIndex = _presets.FindIndex(p => string.Equals(p.Name, active, StringComparison.OrdinalIgnoreCase));
-            _currentStep = _activeIndex >= 0 ? 0 : -1;
-        }
-        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] preset load failed: {ex.Message}"); }
-    }
-
-    private void SavePresetsToConfig()
-    {
-        try
-        {
-            _marksCfg.Set<string>("presets", JsonSerializer.Serialize(_presets));
-            _marksCfg.Set<string>("active", ActivePreset()?.Name ?? "");
-            _marksCfg.Save();
-        }
-        catch (Exception ex) { _services.Log.Warning($"[MarkPresets] preset save failed: {ex.Message}"); }
     }
 }
