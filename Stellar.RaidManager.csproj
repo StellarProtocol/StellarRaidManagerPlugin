@@ -12,9 +12,8 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Resources/raid-manager-icon.png" LogicalName="Stellar.RaidManager.raid-manager-icon.png" />
     <!-- House-style icon art: flat WHITE glyphs pre-drawn per size, Resources/icons/<name>-<px>.png (raidmanager, marks,
-         callouts, countdown, share x 16/24/32/64/128) + the recessed dropdown chevron. The code discovers the sizes from
+         callouts, countdown, share (export), import x 16/24/32/64/128) + the recessed dropdown chevron. The code discovers the sizes from
          these names (Plugin.Style.Blocks.cs IconPng), so swapping in the final art = replacing / adding files here. -->
     <EmbeddedResource Include="Resources/icons/*.png" LogicalName="Stellar.RaidManager.icons.%(Filename)%(Extension)" />
     <!-- Step-comment pencil / check icons, copied from StellarWardrobeLoadout/Icons (explicit LogicalName = stable manifest name). -->

@@ -184,6 +184,7 @@ public sealed partial class Plugin : IStellarPlugin
     private float Scale   => _sizeMult;
     private float RwScale => _rwSizeMult;
 
-    // Launcher tile art — stays the old raid-manager-icon.png until the new "raidmanager" art is chosen.
-    private static byte[]? LoadIconPng() => CachedPng("raid-manager-icon.png");
+    // Launcher tile art — the white "raidmanager" glyph at 128 px, passed straight through like Position does (the
+    // launcher draws its own tile behind it, so no accent background is baked into the PNG).
+    private static byte[]? LoadIconPng() => CachedPng("icons.raidmanager-128.png");
 }

@@ -7,7 +7,7 @@ namespace Stellar.RaidManager;
 // ── Punctuate Mark Presets — import (paste) window ────────────────────────────────────────────────────────────────
 //
 // Opened by the "Import" pill in the Mark Presets window, centred on that pill and in front (WindowCenterer.OpenCentred,
-// house redesign 2026-11-12). House header (32 px "share" icon tile, "Import preset", "Paste a code someone shared"),
+// house redesign 2026-11-12). House header (32 px "import" icon tile, "Import preset", "Paste a code someone shared"),
 // the multi-line text area, then [footer error line | Paste | Import]. Instead of silently reading the clipboard, the
 // user pastes (Ctrl+V, or Paste) or types the code, then presses Import. Decoding + preset creation live in
 // ImportFromBuffer (Plugin.Marks.Share.cs).
@@ -80,7 +80,7 @@ public sealed partial class Plugin
 
     private HudElement BuildImportRoot() => new ColumnElement(new HudElement[]
     {
-        ToolHeader("share", () => _loc.T("rm.marks.importTitle"), () => _loc.T("rm.marks.importSub"),
+        ToolHeader("import", () => _loc.T("rm.marks.importTitle"), () => _loc.T("rm.marks.importSub"),
             () => _importWindow.SetVisible(false), SmallIconSize, SmallGlyph),
         // Width = the window's content width (the TextArea pins its preferredWidth at layout priority 2). Lines 5: a pasted
         // code wraps across ~5 visible rows; longer text scrolls inside the fixed box.
