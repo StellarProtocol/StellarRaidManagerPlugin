@@ -64,7 +64,11 @@ public sealed partial class Plugin
     // The framework Pill dropdown (fw ≥ 2.29 capsule at CornerRadius 13), its fill faded with the window. DropdownElement
     // has NO disabled state, so while `enabled` is false a RECESSED stand-in of the same geometry is swapped in: the
     // framework trigger's own composition (WindowBuilder.Dropdown.Pill.cs: 12 px insets, bold-13 caption, 6 px gap, 8×5
-    // ▾ image, 28 tall) on the sunken fill, not clickable.
+    // ▾ image, 28 tall, caption 1 px below centre with the ▾ kept on the centre) on the sunken fill, not clickable.
+    // ⚠️ The caption must sit DIRECTLY in the centred group Row, like the framework's: wrapped in a Column (DropBold) it
+    // took the cell's slack (a Column in a Row is flexible) → the caption drew LEFT-aligned and the ▾ hugged the right
+    // edge, unlike the live dropdown (seen in-game 2026-11-12). The 1 px drop is done with a 2 px spacer over the WHOLE
+    // row instead (26 px struts, = the framework's 2 px top padding), and the ▾ sits over a 2 px spacer to stay centred.
     private const float DropdownW = 176f;
 
     private HudElement PillDropdown(Func<int> selected, Func<IReadOnlyList<string>> options, Action<int> onSelect,
@@ -84,18 +88,26 @@ public sealed partial class Plugin
         }
         var group = new RowElement(new HudElement[]
         {
-            DropBold(new TextElement(Caption, Color: () => DisabledLabel(PanelColor(), disabled), NoWrap: true, FontSize: 13)
-                { Bold = true, Ellipsize = true }),
+            new TextElement(Caption, Color: () => DisabledLabel(PanelColor(), disabled), NoWrap: true, FontSize: 13)
+                { Bold = true, Ellipsize = true },
             new SpacerElement(6f, 0f),
-            new ImageElement(() => CachedPng("icons.chevron-down.png"), 8, 5)
-                { Tint = () => DisabledLabel(PanelColor(), disabled) },
+            new CellElement(new ColumnElement(new HudElement[]
+            {
+                new ImageElement(() => CachedPng("icons.chevron-down.png"), 8, 5)
+                    { Tint = () => DisabledLabel(PanelColor(), disabled) },
+                new SpacerElement(0f, 2f),   // lifts the ▾ back onto the pill centre (the row sits 1 px low)
+            }, Gap: 0.01f), Width: 8f),
         }, Gap: 0.01f, Justify: RowJustify.Center);
-        var standIn = new BubbleElement(new RowElement(new HudElement[]
+        var standIn = new BubbleElement(new ColumnElement(new HudElement[]
         {
-            new SpacerElement(PillPadX, PillH),
-            new CellElement(group, Width: MathF.Max(0f, width - 2f * PillPadX)),
-            new SpacerElement(PillPadX, PillH),
-        }, Gap: 0.01f, Justify: RowJustify.Center))
+            new SpacerElement(0f, 2f),       // the framework's 2 px top padding: caption 1 px below centre
+            new RowElement(new HudElement[]
+            {
+                new SpacerElement(PillPadX, PillH - 2f),
+                new CellElement(group, Width: MathF.Max(0f, width - 2f * PillPadX)),
+                new SpacerElement(PillPadX, PillH - 2f),
+            }, Gap: 0.01f, Justify: RowJustify.Center),
+        }, Gap: 0.01f))
         {
             FillColorFn = () => DisabledShade, CornerRadius = RoundRadius(PillH), PaddingX = 0f, PaddingY = 0f,
         };

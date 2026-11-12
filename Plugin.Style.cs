@@ -116,12 +116,15 @@ public sealed partial class Plugin
     }
 
     // ── recessed (disabled) look — house rule 22 ──────────────────────────────────────────────────────────────────
-    // A disabled control is SUNKEN: black @28 % drawn translucent over whatever it sits on (so it also fades with the
-    // window opacity like any see-through fill), a faint label (Text @32 %, raised in 0.04 steps until 2:1 on the sunken
-    // fill — the framework's StellarStyle.DisabledLabel), no outline ring, same size. Copied from ChatTools e349c56.
-    private static readonly ColorRgba DisabledShade = new(0f, 0f, 0f, 0.28f);
-    private const float DisabledLabelAlpha = 0.32f;
-    private const float DisabledLabelMinContrast = 2.0f;
+    // A disabled control is SUNKEN: black @38 % drawn translucent over whatever it sits on (so it also fades with the
+    // window opacity like any see-through fill), a STRONGLY faded label (Text @30 %), no outline ring, same size.
+    // Started as ChatTools e349c56 (black @28 %, Text @32 % raised in 0.04 steps until 2:1 — the framework's
+    // StellarStyle.DisabledLabel), but in-game (purple theme, 2026-11-12) that read almost like an unselected chip: on a
+    // mid-tone panel the 2:1 walk lifted the label to ~50-60 % and the shade barely darkened. User: "fill darker than the
+    // panel, label ≈30 %". The 1.3:1 floor only lifts the label on light themes, where 30 % would vanish.
+    private static readonly ColorRgba DisabledShade = new(0f, 0f, 0f, 0.38f);
+    private const float DisabledLabelAlpha = 0.30f;
+    private const float DisabledLabelMinContrast = 1.3f;
 
     private sealed class DisabledLabelCache { public ColorRgba Text, Surface, Label; public bool Valid; }
 
