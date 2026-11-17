@@ -7,7 +7,7 @@
     <NoWarn>CS8632;CS8765</NoWarn>
     <RootNamespace>Stellar.RaidManager</RootNamespace>
     <AssemblyName>Stellar.RaidManager</AssemblyName>
-    <Version>2.8.0</Version>
+    <Version>2.9.0</Version>
     <Deterministic>true</Deterministic>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
@@ -30,9 +30,9 @@
     <!-- i18n P2: consumes IPluginServices.Localization (framework 2.1.0). 2.33.0: BubbleElement.OutlineWidth + the rounded
          window bar (BarElement.CornerRadius / TrackColorFn / FillColorFn) for the countdown card — min framework 2.33.0.
          ⚠️ 2.33.0-local.* comes from the local feed / global package cache until 2.33.0 is published to nuget.org. -->
-    <PackageReference Include="Stellar.Abstractions" Version="2.33.0-local.meterrow.8" />
-    <PackageReference Include="Stellar.PluginContracts" Version="2.33.0-local.meterrow.8" />
-    <PackageReference Include="Stellar.Plugin.InteropRefs" Version="2.33.0-local.meterrow.8" />
+    <PackageReference Include="Stellar.Abstractions" Version="2.33.0" />
+    <PackageReference Include="Stellar.PluginContracts" Version="2.33.0" />
+    <PackageReference Include="Stellar.Plugin.InteropRefs" Version="2.33.0" />
   </ItemGroup>
   <!-- Local overrides: deploy target, game paths, and (while unreleased) a local Stellar.Abstractions
        reference that carries InputElement.SingleLine — all in Local.props (gitignored). Imported AFTER the
