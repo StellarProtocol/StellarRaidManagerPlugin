@@ -21,6 +21,9 @@ internal sealed class McRow
     public long   Arrival;                       // arrival sequence (Order.cs) — set once when the row first appears
     public float  SnapRemain = -1f;              // seconds at SnapTick; -1 = no timer
     public string LocalName = "", OtherNames = "";
+    // Just the suffix of LocalName after the player name (" ×2", " <color=…>(out)</color>"; "" = none): the list card
+    // shows the local player as a YOU tag, so it needs the suffix without the name (Plugin.MechanicCalloutsHud.Names.cs).
+    public string LocalTag = "";
     // What LocalName/OtherNames were last built from (Rows.cs SameNameSource) — skips the per-poll rebuild.
     internal readonly List<(long Uuid, int Safe, int Count)> NameSrc = new();
     internal long    NameSrcLocal;

@@ -143,19 +143,21 @@ internal sealed partial class MechanicCalloutTracker
     private void FinishTargets(McRow row, RowAcc a, long localUuid)
     {
         if (SameNameSource(row, a, localUuid)) return;   // unchanged since the last poll → keep the strings (no garbage)
-        string local = "";
+        string local = "", localTag = "";
         var others = new List<string>(a.Targets.Count);
         foreach (var t in a.Targets)
         {
-            string name = NameFor(t.Uuid);
-            if (a.Counts != null && a.Counts.TryGetValue(t.Uuid, out int k) && k > 1) name += $" ×{k}";
-            if (t.Safe >= 0) name += t.Safe == 1 ? $" <color=#22C55E>{McText.L("rm.mech.safe")}</color>"
-                                                 : $" <color=#EF4444>{McText.L("rm.mech.out")}</color>";
+            string tag = "";
+            if (a.Counts != null && a.Counts.TryGetValue(t.Uuid, out int k) && k > 1) tag += $" ×{k}";
+            if (t.Safe >= 0) tag += t.Safe == 1 ? $" <color=#22C55E>{McText.L("rm.mech.safe")}</color>"
+                                                : $" <color=#EF4444>{McText.L("rm.mech.out")}</color>";
+            string name = NameFor(t.Uuid) + tag;
             bool isLocal = localUuid != 0 && (t.Uuid == localUuid || (t.Uuid >> 16) == (localUuid >> 16));
-            if (isLocal && local.Length == 0) local = name;
+            if (isLocal && local.Length == 0) { local = name; localTag = tag.TrimStart(); }
             else others.Add(name);
         }
         row.LocalName  = local;
+        row.LocalTag   = localTag;
         row.OtherNames = string.Join(", ", others);
         RememberNameSource(row, a, localUuid);
     }

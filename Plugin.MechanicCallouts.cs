@@ -49,8 +49,7 @@ public sealed partial class Plugin
             OnClose: () => _mechWindow.SetVisible(false)));
         _mechWindows.Add(_mechWindow);
 
-        _mechHudScale = Math.Clamp(_cfg.Get<float>("mech_textscale", 1f), 0.75f, 2f);   // callout list "Text size"
-        _mechBgOpacity = Math.Clamp(_cfg.Get<float>("mech_bg_opacity", 0f), 0f, 1f);    // callout list "Background opacity"
+        LoadMechHudSettings();      // list "Text size" / "Background" / "Bar opacity" (Plugin.MechanicCalloutsHud.Scale.cs)
         if (_mechEnabled) RegisterMechCalloutHud();   // Plugin.MechanicCalloutsHud.cs; off ⇒ never registered
         InitMechanicMinimap();      // Plugin.MechanicMinimap.cs (own toggles + HUD window)
         InitMechanicAlerts();       // Plugin.MechanicAlerts.cs (on-me banner + chime)

@@ -18,14 +18,15 @@ namespace Stellar.RaidManager;
 internal static class McPerf
 {
     public const int Poll = 0, Scan = 1, Casts = 2, Rows = 3, Rules = 4, Occur = 5, Minimap = 6, MapFrame = 7,
-                     MapPaint = 8, BuffHook = 9;
-    private const int SlotCount = 10;
+                     MapPaint = 8, BuffHook = 9, Hud = 10;
+    // Hud = the callout list's once-per-refresh state pass (Plugin.MechanicCalloutsHud.State.cs).
+    private const int SlotCount = 11;
     private static readonly string[] Names =
-        { "poll", "scan", "casts", "rows", "rules", "occur", "minimap", "mapFrame", "mapPaint", "buffHook" };
+        { "poll", "scan", "casts", "rows", "rules", "occur", "minimap", "mapFrame", "mapPaint", "buffHook", "hud" };
     private static readonly string[] Buckets =   // fixed strings: no per-call allocation (HitchProbe asks for stable names)
     {
         "rm:mech.poll", "rm:mech.scan", "rm:mech.casts", "rm:mech.rows", "rm:mech.rules", "rm:mech.occur",
-        "rm:mech.minimap", "rm:mech.mapFrame", "rm:mech.mapPaint", "rm:mech.buffHook",
+        "rm:mech.minimap", "rm:mech.mapFrame", "rm:mech.mapPaint", "rm:mech.buffHook", "rm:mech.hud",
     };
 
     public static bool On => HitchProbe.IsEnabled;
