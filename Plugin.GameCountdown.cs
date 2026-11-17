@@ -14,13 +14,34 @@ namespace Stellar.RaidManager;
 //     game's main_team_time_sub view; OFF calls the original. The StartConfirmCountDown handler is NOT touched (it is
 //     bound into Z.EventMgr at Init and calls refreshTeamCountDownView by name, so the override reaches it).
 //   • C# never receives a Lua callback (they crash IL2CPP): it polls the sequence global ≤10 Hz with one typed read.
+//   • PHASE LOCK: the game's beeps come from ITS 1 s timer, which starts when the notify ARRIVES — an arbitrary
+//     0..1 s phase vs the server second. Computing remaining from startSec + server clock therefore flipped our number
+//     up to ~1 s off the beep. Instead a pure-Lua listener on Team.UpdateCountDown (dispatched by that same timer right
+//     after its sound) parks teamCountDown in _rm_gct_count and bumps _rm_gct_tick; the start wrapper parks the initial
+//     teamCountDown. The card shows exactly that count and flips on the tick (see AdvanceLockedCountdown).
 // Everything is defined ONCE as rawset globals (the game's _G drops plain global writes) and re-defined only if a Lua
 // reset lost them; install is idempotent (per-instance / per-module markers) and re-run every 2 s so a reloaded module
 // or a new team_data instance gets wrapped again.
 public sealed partial class Plugin
 {
     private const string GctDefChunk = @"pcall(function()
+rawset(_G, '__rm_gctObj', rawget(_G, '__rm_gctObj') or {})
+rawset(_G, '__rm_gctOnTick', function()
+  pcall(function()
+    local c = tonumber(Z.DataMgr.Get('team_data').teamCountDown)
+    if c ~= nil then
+      rawset(_G, '_rm_gct_count', c)
+      rawset(_G, '_rm_gct_tick', (rawget(_G, '_rm_gct_tick') or 0) + 1)
+    end
+  end)
+end)
+rawset(_G, '__rm_gctListen', function()
+  pcall(function()
+    Z.EventMgr:Add(Z.ConstValue.Team.UpdateCountDown, rawget(_G, '__rm_gctOnTick'), rawget(_G, '__rm_gctObj'))
+  end)
+end)
 rawset(_G, '__rm_gctInstall', function()
+  __rm_gctListen()
   pcall(function()
     local td = Z.DataMgr.Get('team_data')
     if td ~= nil and rawget(td, '__rm_gct') ~= true then
@@ -31,10 +52,15 @@ rawset(_G, '__rm_gctInstall', function()
             rawset(_G, '_rm_gct_start', tonumber(startSec) or 0)
             rawset(_G, '_rm_gct_total', tonumber(Z.Global.TeamConfirmTotalTime) or 10)
             rawset(_G, '_rm_gct_now', tonumber(Z.TimeTools.Now()) or 0)
+          end)
+          local r = start(self, startSec)
+          pcall(function()
+            rawset(_G, '_rm_gct_count', tonumber(self.teamCountDown) or -1)
             rawset(_G, '_rm_gct_kind', 1)
             rawset(_G, '_rm_gct_seq', (rawget(_G, '_rm_gct_seq') or 0) + 1)
+            __rm_gctListen()
           end)
-          return start(self, startSec)
+          return r
         end)
         rawset(td, 'StopTeamConfirmTimer', function(self)
           pcall(function()
@@ -66,6 +92,7 @@ rawset(_G, '__rm_gctInstall', function()
     end
   end)
   if rawget(_G, '_rm_gct_seq') == nil then rawset(_G, '_rm_gct_seq', 0) end
+  if rawget(_G, '_rm_gct_tick') == nil then rawset(_G, '_rm_gct_tick', 0) end
 end)
 rawset(_G, '__rm_gctApply', function(on)
   rawset(_G, '_rm_gct_replace', on == true)
@@ -140,15 +167,60 @@ end)";
             return;
         }
         if (kind != 1d) return;
-        lua.TryReadGlobalNumber("_rm_gct_start", out var startSec);
         lua.TryReadGlobalNumber("_rm_gct_total", out var total);
+        if (total <= 0d) total = 10d;
+        // Phase-locked path: the game's own counter (initial value from the start wrapper, then each timer tick).
+        if (lua.TryReadGlobalNumber("_rm_gct_count", out var count) && lua.TryReadGlobalNumber("_rm_gct_tick", out var tick))
+        {
+            if (count <= 0d || count > total + 1d) return;   // late / stale notify: the game shows no view either
+            BeginCountdown(count, total, fromGame: true, endServerMs: 0);
+            _gctLocked = true;
+            _gctTick   = tick;   // baseline: the start wrapper bumps seq, not tick → the next tick is the first beep
+            _gctCount  = count;
+            _gctTickAge = 0f;
+            return;
+        }
+        lua.TryReadGlobalNumber("_rm_gct_start", out var startSec);
         lua.TryReadGlobalNumber("_rm_gct_now", out var luaNowMs);
-        StartGameCountdown(startSec, total > 0d ? total : 10d, luaNowMs, resume);
+        StartGameCountdown(startSec, total, luaNowMs, resume);
     }
 
-    // remaining = startSec + total − now. Preferred clock: the framework's interpolated server clock
-    // (CombatSnapshot.ServerNowMs); before it has synced (0), or if it disagrees with the game's own clock by > 3 s
-    // (a domain mismatch we haven't validated), fall back to the game's clock at the notify + a local tick.
+    // ── phase lock (game countdown on our card) ───────────────────────────────────────────────────────────────────
+    // ⚠️ Deliberate exception to "≤10 Hz" (Plugin-Performance-Rules §1): while a locked game countdown runs (≤ ~11 s,
+    // bounded by GO! / the game's stop / the 1.5 s fallback) we read ONE typed Lua number (_rm_gct_tick) per frame, so
+    // our number flips on the very frame the game's timer ticks (= its beep). A 10 Hz poll would put it up to 100 ms
+    // behind. Outside that window only the ≤10 Hz seq poll runs. No allocation: constant key, typed double read.
+    private const float GctTickTimeout = 1.5f;   // no tick for this long → decay locally so a missed event can't freeze
+    private bool _gctLocked;
+    private double _gctTick;
+    private double _gctCount;
+    private float _gctTickAge;
+
+    // OnUpdate, only while _running && _ctFromGame && _gctLocked. Sets _remaining; ≤0 lets OnUpdate finish → GO!
+    // on the same frame the game plays its "0" sound.
+    private void AdvanceLockedCountdown(float dt)
+    {
+        var lua = _services.Lua;
+        if (lua.Ready && lua.TryReadGlobalNumber("_rm_gct_tick", out var tick) && tick != _gctTick
+            && lua.TryReadGlobalNumber("_rm_gct_count", out var count))
+        {
+            _gctTick = tick;
+            _gctCount = count;
+            _gctTickAge = 0f;
+            _remaining = count;   // ceil(count) = count → shown number changes exactly now, together with the beep
+            return;
+        }
+        _gctTickAge += dt;
+        _remaining -= dt;   // the bar keeps draining between ticks…
+        // …but the shown second stays the game's count until its next tick (ceil(count − 1 + ε) = count). After the
+        // timeout we let it run free (a missed / unregistered listener); a later tick re-syncs it.
+        if (_gctTickAge < GctTickTimeout) _remaining = Math.Max(_remaining, _gctCount - 1d + 1e-3);
+    }
+
+    // FALLBACK only (no _rm_gct_count — the listener/wrapper didn't record one). remaining = startSec + total − now.
+    // Preferred clock: the framework's interpolated server clock (CombatSnapshot.ServerNowMs); before it has synced
+    // (0), or if it disagrees with the game's own clock by > 3 s (a domain mismatch we haven't validated), fall back to
+    // the game's clock at the notify + a local tick.
     private void StartGameCountdown(double startSec, double total, double luaNowMs, bool resume)
     {
         long endMs = (long)((startSec + total) * 1000d);

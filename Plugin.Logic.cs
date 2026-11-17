@@ -91,6 +91,7 @@ public sealed partial class Plugin
         _total         = Math.Max(1d, total);
         _ctFromGame    = fromGame;
         _ctEndServerMs = endServerMs;
+        _gctLocked     = false;   // the game path re-sets it right after (Plugin.GameCountdown.cs phase lock)
         _goTimer       = 0d;
         _lastShownSec  = -1;
         _running       = true;
@@ -126,10 +127,16 @@ public sealed partial class Plugin
         bool redraw = false;
         if (_running)
         {
-            // A game countdown follows the framework server clock (never ZServerTime — Server-Clock-and-Ping-HUD.md);
-            // /ct, Test, and a game countdown seen before the clock synced count down locally.
-            long now = _ctEndServerMs > 0 ? _services.CombatSnapshot.ServerNowMs : 0;
-            _remaining = now > 0 ? (_ctEndServerMs - now) / 1000d : _remaining - deltaTime;
+            // A game countdown is phase-locked to the game's own 1 s timer (its beeps) — Plugin.GameCountdown.cs.
+            // Fallback when no count was recorded: the framework server clock (never ZServerTime —
+            // Server-Clock-and-Ping-HUD.md). /ct and Test count down locally; their sound and number flip on the same
+            // frame below, so they need no lock.
+            if (_ctFromGame && _gctLocked) AdvanceLockedCountdown(deltaTime);
+            else
+            {
+                long now = _ctEndServerMs > 0 ? _services.CombatSnapshot.ServerNowMs : 0;
+                _remaining = now > 0 ? (_ctEndServerMs - now) / 1000d : _remaining - deltaTime;
+            }
             if (_remaining <= 0d) FinishCountdown();
             else
             {
