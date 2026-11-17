@@ -20,6 +20,7 @@ internal sealed partial class MechanicCalloutTracker
         public Dictionary<long, int>? Counts;  // per-target hit count (>1 → " ×N" after the name; raid Golem Line)
         public float  PhaseSplitSec = -1f;     // two-phase countdown (McRow.PhaseSplitSec), -1 = plain countdown
         public string Phase1 = "", Phase2 = "";
+        public McRingSeq? Ring;                // ring sequence row: step pills (Rules.RingSeq.cs); null = any other row
     }
 
     private readonly Dictionary<string, RowAcc> _acc  = new();
@@ -125,7 +126,7 @@ internal sealed partial class MechanicCalloutTracker
             if (!_rows.TryGetValue(kv.Key, out var row))
                 _rows[kv.Key] = row = new McRow { Key = kv.Key, CreateMs = -1, DurationMs = -1, Arrival = NextArrival() };
             row.Group = a.Group; row.Label = a.Label; row.Color = a.Color; row.Order = a.Order;
-            row.PhaseSplitSec = a.PhaseSplitSec; row.Phase1 = a.Phase1; row.Phase2 = a.Phase2;
+            row.PhaseSplitSec = a.PhaseSplitSec; row.Phase1 = a.Phase1; row.Phase2 = a.Phase2; row.Ring = a.Ring;
             if (row.CreateMs != a.CreateMs || row.StartTick != a.StartTick || row.DurationMs != a.DurMs)
             {
                 row.CreateMs = a.CreateMs; row.StartTick = a.StartTick; row.DurationMs = a.DurMs;
@@ -143,19 +144,21 @@ internal sealed partial class MechanicCalloutTracker
     private void FinishTargets(McRow row, RowAcc a, long localUuid)
     {
         if (SameNameSource(row, a, localUuid)) return;   // unchanged since the last poll → keep the strings (no garbage)
-        string local = "";
+        string local = "", localTag = "";
         var others = new List<string>(a.Targets.Count);
         foreach (var t in a.Targets)
         {
-            string name = NameFor(t.Uuid);
-            if (a.Counts != null && a.Counts.TryGetValue(t.Uuid, out int k) && k > 1) name += $" ×{k}";
-            if (t.Safe >= 0) name += t.Safe == 1 ? $" <color=#22C55E>{McText.L("rm.mech.safe")}</color>"
-                                                 : $" <color=#EF4444>{McText.L("rm.mech.out")}</color>";
+            string tag = "";
+            if (a.Counts != null && a.Counts.TryGetValue(t.Uuid, out int k) && k > 1) tag += $" ×{k}";
+            if (t.Safe >= 0) tag += t.Safe == 1 ? $" <color=#22C55E>{McText.L("rm.mech.safe")}</color>"
+                                                : $" <color=#EF4444>{McText.L("rm.mech.out")}</color>";
+            string name = NameFor(t.Uuid) + tag;
             bool isLocal = localUuid != 0 && (t.Uuid == localUuid || (t.Uuid >> 16) == (localUuid >> 16));
-            if (isLocal && local.Length == 0) local = name;
+            if (isLocal && local.Length == 0) { local = name; localTag = tag.TrimStart(); }
             else others.Add(name);
         }
         row.LocalName  = local;
+        row.LocalTag   = localTag;
         row.OtherNames = string.Join(", ", others);
         RememberNameSource(row, a, localUuid);
     }

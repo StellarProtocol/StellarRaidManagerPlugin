@@ -21,11 +21,16 @@ internal sealed class McRow
     public long   Arrival;                       // arrival sequence (Order.cs) — set once when the row first appears
     public float  SnapRemain = -1f;              // seconds at SnapTick; -1 = no timer
     public string LocalName = "", OtherNames = "";
+    // Just the suffix of LocalName after the player name (" ×2", " <color=…>(out)</color>"; "" = none): the list card
+    // shows the local player as a YOU tag, so it needs the suffix without the name (Plugin.MechanicCalloutsHud.Names.cs).
+    public string LocalTag = "";
     // What LocalName/OtherNames were last built from (Rows.cs SameNameSource) — skips the per-poll rebuild.
     internal readonly List<(long Uuid, int Safe, int Count)> NameSrc = new();
     internal long    NameSrcLocal;
     internal string? NameSrcLang;
     internal bool    NameSrcValid;
+    // Raid ring sequence row only: the step pills + their timing (MechanicCalloutTracker.Rules.RingSeq.cs); null otherwise.
+    public McRingSeq? Ring;
     // Two-phase countdown (raid Golem Line "Locks N.Ns" → "Dash N.Ns"): the timer runs to the SECOND event; the first
     // phase ends PhaseSplitSec before it. -1 = a plain countdown. Phase1/Phase2 = catalog FORMAT keys ("{0}" = seconds),
     // resolved at display time so a live language switch applies.

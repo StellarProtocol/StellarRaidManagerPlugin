@@ -64,7 +64,10 @@ public sealed partial class Plugin
                         SliderRow("rm.mech.list.textSize", MechSubLabelW, MechTip("rm.mech.list.textSize", ListSection, "rm.mech.help.textSize"),
                             () => _mechHudScale, SetMechHudScale, 0.75f, 2f, ValueText(() => _mechHudScale, v => $"{v:0.00}x"), listOn),
                         SliderRow("rm.mech.list.bgOpacity", MechSubLabelW, MechTip("rm.mech.list.bgOpacity", ListSection, "rm.mech.help.listBg"),
-                            () => _mechBgOpacity, SetMechBgOpacity, 0f, 1f, ValueText(() => _mechBgOpacity, v => $"{v * 100f:0}%"), listOn)),
+                            () => _mechBgOpacity, SetMechBgOpacity, 0f, 1f, ValueText(() => _mechBgOpacity, v => $"{v * 100f:0}%"), listOn),
+                        // Row drain fill strength (approved 11-17 card redesign; Plugin.MechanicCalloutsHud.Scale.cs).
+                        SliderRow("rm.mech.list.barOpacity", MechSubLabelW, MechTip("rm.mech.list.barOpacity", ListSection, "rm.mech.help.listBar"),
+                            () => _mechBarOpacity, SetMechBarOpacity, 0f, 1f, ValueText(() => _mechBarOpacity, v => $"{v * 100f:0}%"), listOn)),
                     SectionPanel(() => _loc.T(AlertSection), () => _loc.T("rm.mech.alert.hint"),
                         SettingRow("rm.mech.alert.enable", MechMainLabelW, MechTip("rm.mech.alert.enable", AlertSection, "rm.mech.alert.help"),
                             null, false, OnOffChip(alertOn, SetMechAlertOn)),

@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Stellar.RaidManager;
 
-// ── Raid: electromagnetic ring sequence ("Safe: Middle → Middle → Inner") ───────────────────────────────────────
+// ── Raid: electromagnetic ring sequence (list row = step pills "1 Middle | 2 Middle | 3 Inner") ─────────────────
 // Upstream's ELECTROMAGNETIC_RING_SKILLS (10310062/63/64) are the SAME ids as the ring BODY dummies (DummyTable:
 // inner / middle / outer EMP ring) — its "cast" is the ring body appearing, not a boss skill.
 // Mechanic (log + user, 2026-10-08): each wave spawns TWO ring bodies at the same instant (same scan) at the arena
@@ -25,8 +25,9 @@ namespace Stellar.RaidManager;
 //   • reset (preview): a fresh body ≥ 10 s after the last one (= a NEW preview), or 40 s hold after the last wave. NOT
 //     on despawn: the preview bodies vanish right before the explode phase, exactly when players need the row.
 //     Reset (live): no fresh body for 10 s, or none present and none fresh for 3 s.
-//   • row: "Safe: <last 3 safe rings>" (localized, McText), colour of the latest wave's safe ring (cyan when "?" — a zone, not a player highlight).
-//     Purge: the current step (next to explode) is shown "<b>[Outer]</b>".
+//   • row: the last 3 safe rings as STEP PILLS (McRingSeq, Rules.RingSeq.cs — the list draws them, done / current /
+//     upcoming, with the current step's countdown), colour of the latest wave's safe ring (cyan when "?" — a zone, not
+//     a player highlight), untimed as a row (the pill timer lives on McRingSeq, not the row timing).
 //   • minimap (confident ring arena + ring centre at world (0,0) only): while the latest wave's bodies are present, its
 //     two DANGER bands in the danger style + the safe band outlined. Purge (13023): the CURRENT step's bands instead,
 //     and each decided wave's step number (1/2/3) inside its safe band with the current step highlighted
@@ -130,24 +131,7 @@ internal sealed partial class MechanicCalloutTracker
         RingDangerCheck(now);                                          // MOVE warning: Clash/Brutal + Purge steps (RingDanger.cs)
 
         if (_ringWaves.Count == 0) return;
-        var shown = _ringWaves.Skip(Math.Max(0, _ringWaves.Count - 3)).ToList();
-        var latest = shown[^1];
-        // Purge: the step that explodes next is marked "<b>[Outer]</b>" (RingPurgeCurrentWave — set by RingDangerCheck
-        // above, this same scan). The KEY stays the waves' N.Safe only, so the highlight moving 1 → 2 → 3 just rewrites
-        // the label of the SAME row: no new row, no new occurrence (instance key = row key + timing + epoch).
-        int curN = RingPurgeCurrentWave();
-        Upsert($"raid:ring:{string.Join("-", shown.Select(w => $"{w.N}.{w.Safe}"))}", "Electromagnetic Ring Sequence",
-               McText.F("rm.mech.ring.safe", string.Join(" → ", shown.Select(w => RingStepText(w.Safe, w.N == curN)))),
-               latest.Safe == 0 ? RingUnknownColor : RaidRings[latest.Safe].Color, 101, 0, 0);
-    }
-
-    // One step of the row text. Current Purge step = bold + brackets (language-neutral), NOT the minimap's yellow: an
-    // inline <color> blurs on the HudOverlay list (shadow twin copies the tag — WindowBuilder-Patterns.md
-    // "shadow-twin"); inline <b> is safe. Framework 2.21.0 fixed that blur, but the user chose to keep the brackets.
-    private static string RingStepText(int safe, bool current)
-    {
-        string s = safe == 0 ? "?" : McText.L(RaidRings[safe].ShortKey);
-        return current ? $"<b>[{s}]</b>" : s;
+        RingSeqRow();                                                  // step-pill row (Rules.RingSeq.cs)
     }
 
     // Assign one fresh ring body to the latest wave (window / late join) or open a new wave.

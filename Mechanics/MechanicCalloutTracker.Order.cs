@@ -62,7 +62,12 @@ internal sealed partial class MechanicCalloutTracker
         string? lastGroup = null;
         foreach (var r in rows)
         {
-            if (r.Group != lastGroup) { _lines.Add(new McLine(McText.T(r.Group))); lastGroup = r.Group; }
+            // The ring sequence's pills need a caption that says what they are ("… · SAFE"); grouping stays on r.Group.
+            if (r.Group != lastGroup)
+            {
+                _lines.Add(new McLine(r.Ring != null ? RingSeqHeader : McText.T(r.Group)));
+                lastGroup = r.Group;
+            }
             _lines.Add(new McLine(r));
         }
         RowCount = rows.Count;
