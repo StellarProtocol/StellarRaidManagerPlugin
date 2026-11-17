@@ -11,9 +11,9 @@ namespace Stellar.RaidManager;
 // WindowBuilder-Patterns.md "pre-allocate slots"); a slot is either a small bold muted UPPERCASE group header or a row:
 //   line 1   [■] <label>                         <timer>      timer = fixed-width, right-aligned
 //   line 2       [YOU] ×2 (out), Alice, Bob …  +N             only when the row has targets, at most 2 lines
-// and the row's BACKGROUND is a drain fill (remaining / current phase total) in the mechanic colour > 5 s, theme Caution
-// ≤ 5 s, theme Danger + a red ring ≤ 3 s (Plugin.MechanicCalloutsHud.State.cs). Renders only in-world, when enabled AND
-// there are rows; in layout-edit mode (enabled) it shows the sample card to position (the only preview path). No
+// and the row's BACKGROUND is a drain fill (remaining / current phase total) always in the mechanic colour, plus a red
+// ring (theme Danger) ≤ 3 s — the only time cue (user 2026-11-17; Plugin.MechanicCalloutsHud.State.cs). Renders only
+// in-world, when enabled AND there are rows; in layout-edit mode (enabled) it shows the sample card to position (the only preview path). No
 // BringToFront: it opens from hidden via ShouldRender and lands on top within its ZCat naturally (CLAUDE.md rule 5).
 //
 // ⭐ Fill BEHIND a 1–3 line row = a LayerStackElement (fw 2.33) whose overlays are drawn in order over the base:

@@ -6,7 +6,7 @@ namespace Stellar.RaidManager;
 // Layout-edit sample of the callout list card — the approved mockup's states (§1–3): local-first targets with the YOU
 // tag, a long target list (2 name lines + "+N"), a target-less row, two two-phase rows (Spin Fan "Stops" → "Fire",
 // Golem Line "Locks" → "Dash" — the drain restarts at the phase change) and an untimed row ("—", steady fill). Timers
-// loop so every colour step (mechanic colour → Caution ≤ 5 s → Danger + ring ≤ 3 s) shows. Fictional names only; every
+// loop so the red ring (≤ 3 s; the fill stays the mechanic colour) shows. Fictional names only; every
 // label / header is an existing localized mechanic name (McText) or phase key — no new text. Rebuilt on a language switch.
 // Plus a ring sequence row (step pills Middle / Middle (current) / Inner, Purge timing — Plugin.MechanicCalloutsHud.Ring.cs)
 // under its rm.mech.ring.safeHeader caption.

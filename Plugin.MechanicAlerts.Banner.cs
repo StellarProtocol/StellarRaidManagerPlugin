@@ -10,7 +10,7 @@ namespace Stellar.RaidManager;
 // Each card:
 //   small caption (mechanic colour)        "ON YOU · <GROUP>"  /  mechanic name (MOVE)  /  danger-tile name (MOVE OFF, red)
 //   large action text                       detail ("Left Charge")  /  "MOVE"  /  "MOVE OFF"
-//   large right-aligned timer               same format + colour steps as the list; none when untimed (MOVE OFF)
+//   large right-aligned timer               same format as the list; Caution ≤ 5 s, Danger ≤ 3 s; none if untimed
 // Ring = the mechanic colour, theme Danger at ≤ 3 s and always for MOVE OFF. The card itself is in
 // Plugin.MechanicAlerts.Banner.Card.cs.
 //

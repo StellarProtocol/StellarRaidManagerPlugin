@@ -76,12 +76,13 @@ public sealed partial class Plugin
                 _mechTimer[k] = MechNoTimer; _mechTimerCol[k] = c.MenuMuted;
                 continue;
             }
-            int step = row.IsHitNow ? 2 : MechStep(shown);
+            // List rows: fill stays the mechanic colour and the timer stays normal text at ALL times — the red ring at
+            // ≤ 3 s (or NOW) is the only time cue (user 2026-11-17). The on-me alert cards keep their colour steps.
             _mechFrac[k] = frac;
-            _mechFill[k] = MechStepColor(step, mc) with { A = barA };
-            _mechRing[k] = step == 2;
+            _mechFill[k] = mc with { A = barA };
+            _mechRing[k] = row.IsHitNow || MechRingDue(shown);
             _mechTimer[k] = row.IsHitNow ? MechNowText : MechSecText(shown);
-            _mechTimerCol[k] = MechStepColor(step, c.HudText);
+            _mechTimerCol[k] = c.HudText;
         }
         McPerf.End(McPerf.Hud, perf);
     }

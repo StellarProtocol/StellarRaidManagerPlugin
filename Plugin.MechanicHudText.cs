@@ -43,9 +43,13 @@ public sealed partial class Plugin
         return MechWhole[n < 10 ? 10 : n > 999 ? 999 : n];
     }
 
-    // Colour step of a countdown: 0 = normal (> 5 s), 1 = theme Caution (≤ 5 s), 2 = theme Danger (≤ 3 s, + red ring).
-    // Keyed on the DISPLAYED tenth (+0.05) so "3.0s" is already red and "5.0s" already amber.
+    // ON-ME ALERT CARDS only — colour step of a countdown: 0 = normal (> 5 s), 1 = theme Caution (≤ 5 s), 2 = theme
+    // Danger (≤ 3 s, + red ring). Keyed on the DISPLAYED tenth (+0.05) so "3.0s" is already red and "5.0s" already amber.
+    // The callout LIST rows no longer step their fill / timer colour (user 2026-11-17): they only use MechRingDue.
     private static int MechStep(float v) => v < 3.05f ? 2 : v < 5.05f ? 1 : 0;
+
+    // List rows' red ring (row outline): same ≤ 3 s threshold as MechStep's step 2, so list ring and card ring agree.
+    private static bool MechRingDue(float v) => v < 3.05f;
 
     private ColorRgba MechStepColor(int step, ColorRgba normal) => step == 2 ? Danger : step == 1 ? Caution : normal;
 

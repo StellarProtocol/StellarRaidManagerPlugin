@@ -16,7 +16,7 @@ namespace Stellar.RaidManager;
 // The dark backing keeps done/upcoming readable over ANY drain colour (the old neutral α.06/.14 fills with muted text
 // vanished into the row drain fill in-game, 2026-11-17).
 // Timer + drain fill = time until the CURRENT step explodes, from the tracker's existing manual timing (McRingSeq:
-// Purge 10 s after each wave's spawn, Clash/Brutal 5 s after the latest wave's spawn); same format / colour steps as
+// Purge 10 s after each wave's spawn, Clash/Brutal 5 s after the latest wave's spawn); same format / red ring ≤ 3 s as
 // every other row. No current step (all exploded, or an unknown scene without timing) → "—", steady fill.
 // Perf: every pill is its own (innermost) bubble, so a pill text change re-measures that pill only; the texts come
 // from a per-language table (no per-refresh string building) and only change when the sequence does.
@@ -109,11 +109,11 @@ public sealed partial class Plugin
         }
         float total = seq.ExplodeMs / 1000f;
         float shown = Math.Clamp((seq.Start[cur] + seq.ExplodeMs - now) / 1000f, 0f, total);
-        int step = MechStep(shown);
+        // Same as every list row: mechanic-colour fill + normal timer text always, red ring only ≤ 3 s (State.cs).
         _mechFrac[k] = total > 0.05f ? shown / total : 0f;
-        _mechFill[k] = MechStepColor(step, mc) with { A = barA };
-        _mechRing[k] = step == 2;
+        _mechFill[k] = mc with { A = barA };
+        _mechRing[k] = MechRingDue(shown);
         _mechTimer[k] = MechSecText(shown);
-        _mechTimerCol[k] = MechStepColor(step, c.HudText);
+        _mechTimerCol[k] = c.HudText;
     }
 }
