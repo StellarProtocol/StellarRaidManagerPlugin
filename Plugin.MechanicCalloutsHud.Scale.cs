@@ -31,7 +31,7 @@ public sealed partial class Plugin
     private void LoadMechHudSettings()
     {
         _mechHudScale   = Math.Clamp(_cfg.Get<float>("mech_textscale", 1f), 0.75f, 2f);
-        _mechBgOpacity  = Math.Clamp(_cfg.Get<float>("mech_bg_opacity", 0f), 0f, 1f);
+        _mechBgOpacity  = Math.Clamp(_cfg.Get<float>("mech_bg_opacity", 0.7f), 0f, 1f);
         _mechBarOpacity = Math.Clamp(_cfg.Get<float>("mech_bar_opacity", 0.3f), 0f, 1f);
     }
 
@@ -58,7 +58,7 @@ public sealed partial class Plugin
         RegisterMechCalloutHud();   // same id → saved position restored
     }
 
-    // ── "Background" (config mech_bg_opacity, 0–100 %, step 5 %, default 0 = off) = the card's opacity ───────────
+    // ── "Background" (config mech_bg_opacity, 0–100 %, step 5 %, default 70 %; 0 = off) = the card's opacity ───────────
     // Poll-diffed by the framework (card FillColorFn), so the slider is live with no re-register. 0 whenever there are
     // no lines → never an empty card. Default kept at 0 (Experiment moved to 70 % with this redesign): a saved value is
     // kept either way.
