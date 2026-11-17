@@ -8,7 +8,7 @@ namespace Stellar.RaidManager;
 // The Mechanic Callouts HUD list (data: MechanicCalloutTracker) — approved redesign 2026-11-17, prototype A "grouped"
 // (_scratch/prototypes/raidmanager-callouts-hud-APPROVED.md + raidmanager-callouts-hud.html §1–4; port of Experiment
 // fd828ea). ONE compact rounded card over a FIXED pool of line slots (the element tree is fixed at registration —
-// WindowBuilder-Patterns.md "pre-allocate slots"); a slot is either a small bold muted UPPERCASE group header or a row:
+// WindowBuilder-Patterns.md "pre-allocate slots"); a slot is either a small bold UPPERCASE group header (normal text colour) or a row:
 //   line 1   [■] <label>                         <timer>      timer = fixed-width, right-aligned
 //   line 2       [YOU] ×2 (out), Alice, Bob …  +N             only when the row has targets, at most 2 lines
 // and the row's BACKGROUND is a drain fill (remaining / current phase total) always in the mechanic colour, plus a red
@@ -112,7 +112,9 @@ public sealed partial class Plugin
         for (int s = 0; s < MechHudSlots; s++)
         {
             int i = s;
-            var header = new TextElement(() => MechHeaderText(i), Color: () => Hud.MenuMuted,
+            // Header = normal theme text (HudText, same as the row labels), NOT muted: it names the mechanic a player reads
+            // mid-fight — important HUD text is never muted (user 2026-11-17). Muted stays only for the "+N more" line below.
+            var header = new TextElement(() => MechHeaderText(i), Color: () => Hud.HudText,
                 NoWrap: true, FontSize: MF(MechFontHeader)) { Bold = true, Ellipsize = true, Height = MS(MechHeaderH) };
             // Only the lines that fit the current height (Overflow.cs) — never a half-cut row.
             items[s] = new ConditionalElement(() => i < MechVisible,
