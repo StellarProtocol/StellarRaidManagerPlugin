@@ -27,14 +27,18 @@ public sealed partial class Plugin
     private const float CtBarH      = 14f;
 
     // ── colours ───────────────────────────────────────────────────────────────────────────────────────────────────
-    private static readonly ColorRgba Amber = new(1f, 0.710f, 0.278f);   // #FFB547 (5–4 s)
-    private static readonly ColorRgba Red   = new(1f, 0.294f, 0.294f);   // #FF4B4B (3–1 s, raid warning)
     private static readonly ColorRgba Black = new(0f, 0f, 0f);
     private const float CardFillAlpha  = 0.72f;   // dark translucent card
     private const float CardDarken     = 0.45f;   // theme background pulled 45 % toward black
     private const float CardTrackAlpha = 0.14f;   // bar track = HUD text @14 %
 
     private IThemeColors Hud => _services.Theme.Colors;
+
+    // Status colours are theme-live (fw 2.30 IThemeStatusColors): GO! = Success, 5–4 s = Caution, 3–1 s and the raid
+    // warning = Danger. Read per poll straight off the theme (struct copies — no allocation), so a theme switch or a
+    // custom theme applies without rebuilding the card.
+    private ColorRgba Caution => Hud.Caution;
+    private ColorRgba Danger  => Hud.Danger;
 
     private ColorRgba CardFill(float alpha) => Mix(Hud.MenuBackground, Black, CardDarken) with { A = CardFillAlpha * alpha };
 
@@ -74,9 +78,9 @@ public sealed partial class Plugin
 
     private ColorRgba? CtNumberColor()
     {
-        if (CtGo) return Hud.HudAccent;
+        if (CtGo) return Hud.Success;
         int s = CtSec;
-        return s <= 3 ? Red : s <= 5 ? Amber : Hud.HudText;
+        return s <= 3 ? Danger : s <= 5 ? Caution : Hud.HudText;
     }
 
     private float CtFraction() => CtGo ? 0f : _running ? (float)Math.Clamp(_remaining / _total, 0d, 1d) : 1f;
@@ -84,11 +88,11 @@ public sealed partial class Plugin
     private ColorRgba? CtBarFill()
     {
         int s = CtSec;
-        return s <= 3 ? Red : s <= 5 ? Amber : Hud.HudAccent;
+        return s <= 3 ? Danger : s <= 5 ? Caution : Hud.HudAccent;
     }
 
-    // Ring: none > 3 s, red 3–1 s, accent during GO!. Null hides the ring (OutlineColorFn contract).
-    private ColorRgba? CtRing() => CtGo ? Hud.HudAccent : _running && ShownSec() <= 3 ? Red : null;
+    // Ring: none > 3 s, Danger 3–1 s, Success during GO!. Null hides the ring (OutlineColorFn contract).
+    private ColorRgba? CtRing() => CtGo ? Hud.Success : _running && ShownSec() <= 3 ? Danger : null;
 
     private HudElement CountdownCard(float s)
     {
@@ -118,7 +122,7 @@ public sealed partial class Plugin
     }
 
     // ── raid-warning card (Red overlay style) ────────────────────────────────────────────────────────────────────
-    // Same card, red ring always, red caption "RAID WARNING · <sender>", message in HUD text colour. The existing 5 s
+    // Same card, Danger ring always, Danger caption "RAID WARNING · <sender>", message in HUD text colour. The existing 5 s
     // timer's last second fades the fill, ring and both texts together.
     private float RwAlpha => _rwVisible ? (float)Math.Clamp(_rwTimer, 0d, 1d) : 1f;
 
@@ -140,14 +144,14 @@ public sealed partial class Plugin
         int capFont = (int)MathF.Round(CapFont * s), msgFont = (int)MathF.Round(RwMsgFont * s);
         var card = new BubbleElement(new ColumnElement(new HudElement[]
         {
-            new TextElement(RwCaption, Color: () => Red with { A = RwAlpha }, Width: inner, Align: TextAlign.Center,
+            new TextElement(RwCaption, Color: () => Danger with { A = RwAlpha }, Width: inner, Align: TextAlign.Center,
                 NoWrap: true, FontSize: capFont) { Bold = true, Ellipsize = true, Height = MathF.Round(capFont * 1.4f) },
             // Wraps inside the fixed card width (a long /rw grows the card downward, never wider).
             new TextElement(RwMessage, Color: () => Hud.HudText with { A = RwAlpha }, Width: inner,
                 Align: TextAlign.Center, FontSize: msgFont) { Bold = true, MaxLines = 3 },
         }, Gap: MathF.Max(1f, MathF.Round(CardGap * s))))
         {
-            FillColorFn = () => CardFill(RwAlpha), OutlineColorFn = () => Red with { A = RwAlpha },
+            FillColorFn = () => CardFill(RwAlpha), OutlineColorFn = () => Danger with { A = RwAlpha },
             OutlineWidth = CardRing * s, CornerRadius = MathF.Round(CardRadius * s), PaddingX = padX,
             PaddingY = MathF.Round(CardPadY * s), MaxWidth = w,
         };
