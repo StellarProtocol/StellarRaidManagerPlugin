@@ -166,8 +166,10 @@ public sealed partial class Plugin
         var line1 = new RowElement(new HudElement[]
         {
             new SwatchElement(() => MechRowColor(i), MS(MechSwatch)),
-            new CellElement(new TextElement(() => MechSlotLabel(i), Color: () => Hud.HudText,
-                NoWrap: true, FontSize: MF(MechFontLabel)) { Bold = true, Ellipsize = true, Height = l1 }, Weight: 1f),
+            // Ring sequence row: step pills instead of the label (Plugin.MechanicCalloutsHud.Ring.cs).
+            new CellElement(new ConditionalElement(() => MechIsSeq(i), MechPillRow(i, l1),
+                Else: new TextElement(() => MechSlotLabel(i), Color: () => Hud.HudText,
+                    NoWrap: true, FontSize: MF(MechFontLabel)) { Bold = true, Ellipsize = true, Height = l1 }), Weight: 1f),
             new CellElement(timer, Width: tw),
         }, Gap: gap);
 
@@ -212,6 +214,7 @@ public sealed partial class Plugin
     private ColorRgba MechRowColor(int i)
     {
         var row = MechLineAt(i)?.Row;
+        if (row?.Ring != null) { MechHudFrame(); return _mechSeqSwatch[i]; }   // the CURRENT step's ring (Ring.cs)
         return row != null ? MechanicCalloutData.SlotColor(row.Color) : MechanicCalloutData.SlotColor(0);
     }
 }

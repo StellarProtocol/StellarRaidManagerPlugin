@@ -290,6 +290,7 @@
   "rm.mech.ring.name": "วงแหวนแม่เหล็กไฟฟ้า",
   "rm.mech.ring.outer": "วงนอก",
   "rm.mech.ring.safe": "ปลอดภัย: {0}",
+  "rm.mech.ring.safeHeader": "วงแหวนแม่เหล็กไฟฟ้า · ปลอดภัย",
   "rm.mech.ring.step": "วงแหวนแม่เหล็กไฟฟ้า · ขั้นที่ {0}/{1}",
   "rm.mech.safe": "(ปลอดภัย)",
   "rm.mech.status.alertOff": "แจ้งเตือน ปิด",

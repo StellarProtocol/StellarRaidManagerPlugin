@@ -290,6 +290,7 @@
   "rm.mech.ring.name": "電磁リング",
   "rm.mech.ring.outer": "外周",
   "rm.mech.ring.safe": "安全：{0}",
+  "rm.mech.ring.safeHeader": "電磁リング・安全",
   "rm.mech.ring.step": "電磁リング・ステップ {0}/{1}",
   "rm.mech.safe": "（安全）",
   "rm.mech.status.alertOff": "アラート オフ",

@@ -63,8 +63,10 @@ public sealed partial class Plugin
         for (int k = 0; k < _mechVisible; k++)
         {
             var line = lines[k];
+            _mechIsSeq[k] = false;
             if (line.Header != null) { MechHeaderState(k, line.Header); continue; }
             var row = line.Row!;
+            if (row.Ring is { } seq) { MechSeqState(k, row, seq, barA); continue; }   // step pills (Ring.cs)
             var mc = MechanicCalloutData.SlotColor(row.Color);
             MechLabelState(k, row);
             if (!MechRowTime(row, out float shown, out float frac))

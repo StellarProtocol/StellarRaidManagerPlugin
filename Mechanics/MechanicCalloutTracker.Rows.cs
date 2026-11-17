@@ -20,6 +20,7 @@ internal sealed partial class MechanicCalloutTracker
         public Dictionary<long, int>? Counts;  // per-target hit count (>1 → " ×N" after the name; raid Golem Line)
         public float  PhaseSplitSec = -1f;     // two-phase countdown (McRow.PhaseSplitSec), -1 = plain countdown
         public string Phase1 = "", Phase2 = "";
+        public McRingSeq? Ring;                // ring sequence row: step pills (Rules.RingSeq.cs); null = any other row
     }
 
     private readonly Dictionary<string, RowAcc> _acc  = new();
@@ -125,7 +126,7 @@ internal sealed partial class MechanicCalloutTracker
             if (!_rows.TryGetValue(kv.Key, out var row))
                 _rows[kv.Key] = row = new McRow { Key = kv.Key, CreateMs = -1, DurationMs = -1, Arrival = NextArrival() };
             row.Group = a.Group; row.Label = a.Label; row.Color = a.Color; row.Order = a.Order;
-            row.PhaseSplitSec = a.PhaseSplitSec; row.Phase1 = a.Phase1; row.Phase2 = a.Phase2;
+            row.PhaseSplitSec = a.PhaseSplitSec; row.Phase1 = a.Phase1; row.Phase2 = a.Phase2; row.Ring = a.Ring;
             if (row.CreateMs != a.CreateMs || row.StartTick != a.StartTick || row.DurationMs != a.DurMs)
             {
                 row.CreateMs = a.CreateMs; row.StartTick = a.StartTick; row.DurationMs = a.DurMs;

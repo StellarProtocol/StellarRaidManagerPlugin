@@ -290,6 +290,7 @@
   "rm.mech.ring.name": "전자기 고리",
   "rm.mech.ring.outer": "바깥쪽",
   "rm.mech.ring.safe": "안전: {0}",
+  "rm.mech.ring.safeHeader": "전자기 고리 · 안전",
   "rm.mech.ring.step": "전자기 고리 · {0}/{1}단계",
   "rm.mech.safe": "(안전)",
   "rm.mech.status.alertOff": "경고 꺼짐",

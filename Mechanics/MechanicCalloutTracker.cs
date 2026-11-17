@@ -29,6 +29,8 @@ internal sealed class McRow
     internal long    NameSrcLocal;
     internal string? NameSrcLang;
     internal bool    NameSrcValid;
+    // Raid ring sequence row only: the step pills + their timing (MechanicCalloutTracker.Rules.RingSeq.cs); null otherwise.
+    public McRingSeq? Ring;
     // Two-phase countdown (raid Golem Line "Locks N.Ns" → "Dash N.Ns"): the timer runs to the SECOND event; the first
     // phase ends PhaseSplitSec before it. -1 = a plain countdown. Phase1/Phase2 = catalog FORMAT keys ("{0}" = seconds),
     // resolved at display time so a live language switch applies.

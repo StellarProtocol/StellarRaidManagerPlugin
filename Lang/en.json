@@ -290,6 +290,7 @@
   "rm.mech.ring.name": "Electromagnetic Ring",
   "rm.mech.ring.outer": "Outer",
   "rm.mech.ring.safe": "Safe: {0}",
+  "rm.mech.ring.safeHeader": "Electromagnetic Ring · Safe",
   "rm.mech.ring.step": "Electromagnetic Ring · Step {0}/{1}",
   "rm.mech.safe": "(safe)",
   "rm.mech.status.alertOff": "Alert off",
