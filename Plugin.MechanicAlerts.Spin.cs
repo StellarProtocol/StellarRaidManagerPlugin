@@ -1,11 +1,12 @@
 namespace Stellar.RaidManager;
 
-// Raid Spin Fan: "Spin Fan — MOVE" banner while the LOCAL player stands in a wedge of the current (predicted, then
+// Raid Spin Fan: "SPIN FAN | MOVE" card while the LOCAL player stands in a wedge of the current (predicted, then
 // actual) pinwheel before it fires (tracker LocalSpinDanger, Mechanics/MechanicCalloutTracker.Rules.SpinFan.cs). Same
-// model as the ring MOVE banner: polled from tracker state (slot after the ring MOVE banner, above the on-me banners),
-// so it clears by itself when the player leaves the wedges or the wave fires. Detail = the live row's phase text
-// ("Stops 2.1s" / "Fire 0.6s" — DetailLine reads Occ.Row.PhaseText). One chime per ENTRY (a re-entry builds a new
-// banner and may chime again). Red (slot colour 3), like the other MOVE banners.
+// model as the ring MOVE card: polled from tracker state (slot after the ring MOVE card, above the on-me cards), so it
+// clears by itself when the player leaves the wedges or the wave fires. Timer = the live row's phase countdown ("Stops"
+// then "Fire" — the card reads Occ.Row). One chime per ENTRY (a re-entry builds a new banner and may chime again).
+// Caption + ring in the Spin Fan row colour (the list's), ring red ≤ 3 s like every card. Text: rm.mech.n.spinFan +
+// rm.mech.alert.move.
 public sealed partial class Plugin
 {
     private Banner? _spinBanner;
@@ -19,7 +20,7 @@ public sealed partial class Plugin
             _spinBanner = new Banner
             {
                 Occ = new McOccurrence { Key = MechanicCalloutTracker.SpinFanKey, Color = 3, Row = row },
-                Headline = _loc.TFormat("rm.mech.banner.move", McText.T("Spin Fan")),
+                Caption = McText.T("Spin Fan").ToUpperInvariant(), Action = _loc.T("rm.mech.alert.move"), Color = row.Color,
             };
             if (entering && _alertSound) PlayAlertSound();
         }

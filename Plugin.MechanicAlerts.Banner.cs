@@ -5,27 +5,24 @@ using Stellar.Abstractions.Services;
 
 namespace Stellar.RaidManager;
 
-// The on-me banner HUD (Plugin.MechanicAlerts.cs raises it). Up to 3 stacked banners, newest first, each two lines:
-//   headline  "<MECHANIC> — YOU"   in the mechanic colour   (28 px × Banner size; default 1.5× = 42 px)
-//   detail    "<what about it>  <countdown>"                 (20 px × Banner size)
+// The on-me alert HUD (Plugin.MechanicAlerts.cs raises it) — approved redesign 2026-11-17 (raidmanager-callouts-hud.html
+// §5; port of Experiment 877eed8): up to 3 stacked RINGED CARDS, newest on top, same family as the callout list card.
+// Each card:
+//   small caption (mechanic colour)        "ON YOU · <GROUP>"  /  mechanic name (MOVE)  /  danger-tile name (MOVE OFF, red)
+//   large action text                       detail ("Left Charge")  /  "MOVE"  /  "MOVE OFF"
+//   large right-aligned timer               same format + colour steps as the list; none when untimed (MOVE OFF)
+// Ring = the mechanic colour, theme Danger at ≤ 3 s and always for MOVE OFF. The card itself is in
+// Plugin.MechanicAlerts.Banner.Card.cs.
 //
-// SIZE: the window uses Surface = HudOverlay, the only surface whose TextElement honours DynamicFontSize (re-read
-// each refresh, no upper clamp — WindowBuilder.HudOverlay BuildTextHud / TextBinding.Apply). The default Menu surface
-// bakes FontSize at build time (WindowBuilder.StyledText), so a live slider there would need a window rebuild.
-// No Emphasis on these texts: on a CHANGING text Emphasis re-asserts its fixed ~15-20 px size every change
-// (WindowBuilder-Patterns.md "Emphasis CLOBBERS DynamicFontSize") — the countdown would collapse. HudOverlay text
-// is shadowed for legibility instead. Each line is a fixed-width (BannerW) centre-aligned cell, so the text stays
-// horizontally centred at the default spot at ANY size; the borderless window is click-through (Passive), so its
-// wide box is invisible.
-//
-// TEXT: always names the mechanic, localized. Headline = the row GROUP (e.g. "Half-Field Charge Target"); for a
-// scene-generic group ("Tina · Mechanic") the label's first part is the headline instead ("Wudi-Slash Mark" — every
-// locale keeps the " · " separator in those labels). Detail = the row LABEL minus anything the headline already says
-// ("Left Charge", "Slash 3", "1F · Top Left", "x2"); dropped when it would only repeat the headline. Both empty →
-// "#<buffId>" from the row key. The group check runs on the ENGLISH group; the text uses the localized group.
+// TEXT: always names the mechanic, localized. Head = the row GROUP (e.g. "Half-Field Charge Target"); for a
+// scene-generic group ("Tina · Mechanic") the label's first part is the head instead ("Wudi-Slash Mark" — every locale
+// keeps the " · " separator in those labels). Detail = the row LABEL minus anything the head already says ("Left
+// Charge", "Slash 3", "1F · Top Left", "x2"); the head when that leaves nothing. Both empty → "#<buffId>" from the row
+// key. The group check runs on the ENGLISH group; the text uses the localized group. Captions / actions are built once
+// per banner (a language switch applies to the next banner).
 public sealed partial class Plugin
 {
-    private const float BannerW = 2400f;                   // fixed centred cell width (1440p canvas units)
+    private const float BannerW = 2400f;                   // window width (1440p canvas units); cards centre in it
     private float _alertScale = 1.5f;                      // "Banner size" (1–6×, 0.5 steps; default 1.5×)
 
     private sealed class Banner
@@ -33,7 +30,13 @@ public sealed partial class Plugin
         public McOccurrence Occ = null!;
         public long TestUntil;
         public long UntimedUntil;          // untimed occurrence (no countdown): banner expiry tick, 0 = timed
-        public string Headline = "", Detail = "";
+        public string Caption = "", Action = "";
+        // Two-phase on-me rows (Golem Line): the action carries the phase word, picked per refresh (cached strings).
+        public string ActionP1 = "", ActionP2 = "";
+        public int  Color;                 // MechanicCalloutData slot of the caption + ring
+        public bool DangerTile;            // MOVE OFF: Danger caption + ring, never a timer
+        public bool Sample;                // layout-edit sample: fixed "8.0s"
+        public string ActionNow => ActionP1.Length > 0 && Occ.Row.IsPhased ? (Occ.Row.InFirstPhase ? ActionP1 : ActionP2) : Action;
     }
     private readonly List<Banner> _banners = new();
 
@@ -43,14 +46,21 @@ public sealed partial class Plugin
     private Banner MakeBanner(McOccurrence o, long testMs)
     {
         var (head, detail) = BannerText(o.Group ?? "", o.Label ?? "", o.Key ?? "");
-        return new Banner
+        string action = detail.Length > 0 ? detail : head;
+        var b = new Banner
         {
             Occ = o, TestUntil = testMs > 0 ? Environment.TickCount64 + testMs : 0,
             // Untimed mechanic (no duration — e.g. Reef Duet colour): banner for AlertUntimedMs only, else it would
             // stay as long as the row (forever). A fresh occurrence (new instance) shows again.
             UntimedUntil = testMs <= 0 && !o.Row.HasTimer ? Environment.TickCount64 + AlertUntimedMs : 0,
-            Headline = _loc.TFormat("rm.mech.banner.you", head), Detail = detail,
+            Caption = _loc.TFormat("rm.mech.alert.onYou", head).ToUpperInvariant(), Action = action, Color = o.Color,
         };
+        if (o.Row.IsPhased)
+        {
+            b.ActionP1 = action + " · " + MechPhaseWord(o.Row.Phase1);
+            b.ActionP2 = action + " · " + MechPhaseWord(o.Row.Phase2);
+        }
+        return b;
     }
 
     // groupEn = the row's ENGLISH group (GenericGroups check); label = the already-localized row label.
@@ -61,7 +71,7 @@ public sealed partial class Plugin
         string head = group, detail = label;
         if (groupEn.Length == 0 || GenericGroups.Contains(groupEn))
         {
-            // Headline from the label: "Wudi-Slash Mark · Slash 3" → "Wudi-Slash Mark" + "Slash 3".
+            // Head from the label: "Wudi-Slash Mark · Slash 3" → "Wudi-Slash Mark" + "Slash 3".
             int dot = label.IndexOf(" · ", StringComparison.Ordinal);
             head = dot > 0 ? label.Substring(0, dot) : label;
             detail = dot > 0 ? label.Substring(dot + 3) : "";
@@ -89,8 +99,8 @@ public sealed partial class Plugin
                 Category:    WindowCategory.HUD,
                 Style:       WindowPanelStyle.Borderless)
             {
+                // Menu surface (the default): the card, its ring and Bold sized text only exist there (Banner.Card.cs).
                 Draggable = true, EditModeDragOnly = true, Closable = false, StartVisible = false, Passive = true,
-                Surface = SurfaceStyle.HudOverlay,
                 ShouldRender = () => (_alertOn || AlertTestRunning) && MechInWorld
                                   && (_services.ClientState.UiState & GameUIState.Blocking) == 0
                                   && (_services.Windows.IsLayoutEditing || AnyBanner()),
@@ -123,28 +133,29 @@ public sealed partial class Plugin
         return null;
     }
 
-    // "<mechanic> — MOVE OFF <tile>": shown while the local player stands in a marked danger tile — Phase Mapping,
-    // Edge-Mid Explosion or Corner Explosion (tracker LocalDanger* — cheap: computed in the 200 ms scan; precedence
-    // Phase Mapping → Edge-Mid → Corner when tiles overlap). Plays the alert sound when it starts, at most every 3 s.
+    // "MOVE OFF" card: shown while the local player stands in a marked danger tile — Phase Mapping, Edge-Mid Explosion
+    // or Corner Explosion (tracker LocalDanger* — cheap: computed in the 200 ms scan; precedence Phase Mapping →
+    // Edge-Mid → Corner when tiles overlap). Rebuilt when the tile key or cell changes (compared field by field — the
+    // poll runs every refresh, so no per-poll signature string). Plays the alert sound when it starts, at most every 3 s.
     private Banner? _dangerBanner;
-    private string _dangerSig = "";              // key|cell the cached banner was built for ("" = none)
+    private string _dangerKey = "", _dangerCell = "";   // what the cached banner was built for ("" = none)
     private long _dangerSoundAt;
 
     private Banner? DangerBanner()
     {
         if (!_alertOn) return null;
         string key = _mechTracker.LocalDangerKey, cell = _mechTracker.LocalDangerCell;
-        if (key.Length == 0) { _dangerSig = ""; return null; }
-        string sig = key + "|" + cell;
-        if (sig != _dangerSig || _dangerBanner == null)
+        if (key.Length == 0) { _dangerKey = ""; return null; }
+        if (key != _dangerKey || cell != _dangerCell || _dangerBanner == null)
         {
-            bool starting = _dangerSig.Length == 0;
-            _dangerSig = sig;
+            bool starting = _dangerKey.Length == 0;
+            _dangerKey = key; _dangerCell = cell;
             _dangerBanner = new Banner
             {
                 Occ = new McOccurrence { Key = key, Color = 3, Row = new McRow() },
                 // Mechanic name via the shared rm.mech.n.* keys (McText.Names: phaseMapping / edgeMid / corner).
-                Headline = _loc.TFormat("rm.mech.banner.moveOff", McText.T(_mechTracker.LocalDangerName)), Detail = cell,
+                Caption = McText.T(_mechTracker.LocalDangerName).ToUpperInvariant(), Action = _loc.T("rm.mech.alert.moveOff"),
+                Color = 3, DangerTile = true,
             };
             long now = Environment.TickCount64;
             if (starting && _alertSound && now - _dangerSoundAt > 3000) { _dangerSoundAt = now; PlayAlertSound(); }
@@ -152,59 +163,27 @@ public sealed partial class Plugin
         return _dangerBanner;
     }
 
-    // Layout-edit sample; its text is composed live (localized) in SampleHeadline / DetailLine.
-    private static readonly Banner SampleBanner = new();
-    private string SampleHeadline => _loc.TFormat("rm.mech.banner.you", McText.T("Half-Field Charge Target"));
+    // Layout-edit sample at the current size, for positioning — rebuilt on a language switch.
+    private Banner? _sampleBanner;
+    private string? _sampleLang;
+
+    private Banner SampleBanner()
+    {
+        var lang = _loc.Language;
+        if (_sampleBanner == null || !string.Equals(lang, _sampleLang, StringComparison.Ordinal))
+        {
+            _sampleLang = lang;
+            _sampleBanner = new Banner
+            {
+                Occ = new McOccurrence { Row = new McRow() },
+                Caption = _loc.TFormat("rm.mech.alert.onYou", McText.T("Half-Field Charge Target")).ToUpperInvariant(),
+                Action = McText.T("Left Charge"), Color = 5, Sample = true,
+            };
+        }
+        return _sampleBanner;
+    }
 
     // Live banner, or (slot 0 in layout edit with nothing live) a sample at the current size for positioning.
     private Banner? ShownAt(int i) =>
-        BannerAt(i) ?? (i == 0 && _services.Windows.IsLayoutEditing ? SampleBanner : null);
-
-    private string DetailLine(Banner b)
-    {
-        if (b == SampleBanner) return McText.T("Left Charge") + "  8.0s";
-        // Two-phase countdown (Golem Line): the phase text IS the detail line ("Locks 3.1s" / "Dash 1.8s").
-        if (b.Occ.Row.IsPhased) return b.Occ.Row.PhaseText;
-        string t = !b.Occ.Row.HasTimer ? "" : b.Occ.Row.IsHitNow ? _loc.T("rm.mech.now")   // release buff marked the hit
-            : $"{b.Occ.Row.ShownRemainSec:0.0}s";                                      // hit-offset adjusted
-        return b.Detail.Length == 0 ? t : t.Length == 0 ? b.Detail : $"{b.Detail}   {t}";
-    }
-
-    // Headline in bold via an inline rich-text tag — NOT Emphasis, which on the HudOverlay surface resets the
-    // DynamicFontSize (WindowBuilder-Patterns.md). The tag wraps the FINAL string (after localization + formatting),
-    // so a translation can never split or drop it. Cached per slot: the text lambda runs every refresh.
-    private readonly string?[] _bannerHeadSrc = new string?[AlertSlots], _bannerHeadBold = new string?[AlertSlots];
-
-    private string BoldHeadline(int slot, string text)
-    {
-        if (text.Length == 0) return "";
-        if (!ReferenceEquals(_bannerHeadSrc[slot], text) && _bannerHeadSrc[slot] != text)
-        {
-            _bannerHeadSrc[slot] = text;
-            _bannerHeadBold[slot] = "<b>" + text + "</b>";
-        }
-        return _bannerHeadBold[slot]!;
-    }
-
-    private HudElement BuildAlertHudRoot()
-    {
-        var slots = new HudElement[AlertSlots];
-        for (int s = 0; s < AlertSlots; s++)
-        {
-            int i = s;
-            slots[s] = new ConditionalElement(() => ShownAt(i) != null,
-                new ColumnElement(new HudElement[]
-                {
-                    new TextElement(() => ShownAt(i) is { } h ? BoldHeadline(i, h == SampleBanner ? SampleHeadline : h.Headline) : "",
-                        Color: () => (ColorRgba?)MechanicCalloutData.SlotColor(ShownAt(i) is { } b && b != SampleBanner ? b.Occ.Color : 3),
-                        Width: BannerW, Align: TextAlign.Center, Shadow: true, NoWrap: true, ShadowDistance: 3)
-                    { DynamicFontSize = () => (int)MathF.Round(28f * _alertScale) },
-                    new TextElement(() => ShownAt(i) is { } b ? DetailLine(b) : "",
-                        Color: () => (ColorRgba?)_services.Theme.Colors.HudText,
-                        Width: BannerW, Align: TextAlign.Center, Shadow: true, NoWrap: true, ShadowDistance: 2)
-                    { DynamicFontSize = () => (int)MathF.Round(20f * _alertScale) },
-                }, Gap: 2f));
-        }
-        return new ColumnElement(slots, Gap: 12f) { Padding = 10 };
-    }
+        BannerAt(i) ?? (i == 0 && _services.Windows.IsLayoutEditing ? SampleBanner() : null);
 }

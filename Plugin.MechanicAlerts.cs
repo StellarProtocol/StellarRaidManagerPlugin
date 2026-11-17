@@ -5,9 +5,9 @@ using Stellar.Abstractions.Services;
 namespace Stellar.RaidManager;
 
 // "Mechanic Alerts" — reacts to the tracker's new-occurrence event (Mechanics/MechanicCalloutTracker.Occurrence.cs).
-// "On me": when the LOCAL player is among a new occurrence's targets (or joins an existing row's targets), a big
-// banner "<MECHANIC> — YOU" in the mechanic colour with a countdown appears on a HUD window (up to 3 stacked, newest
-// on top) and stays until the row ends (untimed mechanics: 5 s); optionally the built-in chime plays through
+// "On me": when the LOCAL player is among a new occurrence's targets (or joins an existing row's targets), a ringed
+// card "ON YOU · <GROUP>" + action in the mechanic colour with a countdown appears on a HUD window (up to 3 stacked,
+// newest on top) and stays until the row ends (untimed mechanics: 5 s); optionally the built-in chime plays through
 // MechAudioPlayer (local speakers, winmm). Raid danger tiles (Phase Mapping, Edge-Mid / Corner Explosion) get a
 // "MOVE OFF" banner instead (Plugin.MechanicAlerts.Banner.cs). Settings are the ON-ME ALERT section of the Mechanic
 // Callouts window (Plugin.MechanicCallouts.Ui.cs), whose header "Test alert" works even with the alert off: the banner
@@ -31,7 +31,8 @@ public sealed partial class Plugin
         _alertOn     = _cfg.Get<bool>("mech_alert_on", false);
         _alertSound  = _cfg.Get<bool>("mech_alert_sound", true);
         _alertVolume = Math.Clamp(_cfg.Get<float>("mech_alert_volume", 0.8f), 0f, 1f);
-        _alertScale  = Math.Clamp(_cfg.Get<float>("mech_alert_scale", 1.5f), 1f, 6f);
+        // 0.5 steps on load too: each step is its own prebuilt card variant (Banner.Card.cs), matched with ==.
+        _alertScale  = Math.Clamp(MathF.Round(_cfg.Get<float>("mech_alert_scale", 1.5f) * 2f) / 2f, 1f, 6f);
 
         _mechTracker.Occurrence += OnMechOccurrence;
         if (_alertOn) RegisterMechAlertHud();   // Plugin.MechanicAlerts.Banner.cs; off ⇒ never registered
