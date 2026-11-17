@@ -16,9 +16,17 @@ public sealed partial class Plugin : IStellarPlugin
     private readonly IDisposable _launcherEntry;
     private readonly IConfigSection _cfg;
 
-    // Countdown state
+    // Countdown state (Plugin.Logic.cs). One card shows the NEWEST countdown — a /ct, the Test button, or the game's own
+    // leader countdown (Plugin.GameCountdown.cs) — so a later start simply overwrites these.
     private bool _running;
-    private double _remaining;
+    private double _remaining;        // seconds left (chat / local-tick source)
+    private double _total = 10d;      // seconds at start — the bar's full length
+    private double _goTimer;          // > 0 while the 1 s "GO!" card shows after reaching 0
+    private bool _ctFromGame;         // the running countdown is the game's (no sounds of ours; a game stop ends it)
+    private long _ctEndServerMs;      // game source: end on the framework server clock; 0 = count down locally instead
+    private int _lastShownSec = -1;   // last whole second drawn / sounded (sound + MarkDirty on each change)
+    private bool _ctReplaceGame;      // "Replace game countdown" (ct_replace_game, default ON)
+    private bool _ctSounds;           // "Countdown sounds" for /ct + Test (ct_sounds, default ON)
     private float _sizeMult;
     private bool _ctEnabled;
     private bool _ctParty;
@@ -33,6 +41,7 @@ public sealed partial class Plugin : IStellarPlugin
     private bool _rwGuild;
     private bool _rwLocal;
     private string _rwText = "";
+    private string _rwSender = "";    // msg.SenderName of the live /rw ("" = Test → caption without a name)
     private bool _rwVisible;
     private double _rwTimer;
 
@@ -51,6 +60,8 @@ public sealed partial class Plugin : IStellarPlugin
         _ctParty   = _cfg.Get<bool>("ct_channel_party", true);
         _ctGuild   = _cfg.Get<bool>("ct_channel_guild", true);
         _ctLocal   = _cfg.Get<bool>("ct_channel_local", false);
+        _ctReplaceGame = _cfg.Get<bool>("ct_replace_game", true);
+        _ctSounds      = _cfg.Get<bool>("ct_sounds", true);
         _rwEnabled            = _cfg.Get<bool>("rw_enabled", true);
         _rwUseIngameWarning   = _cfg.Get<bool>("rw_ingame_warning", true);
         _rwSizeMult           = SizeToMult(_cfg.Get<string>("rw_size", "large"));
@@ -65,6 +76,10 @@ public sealed partial class Plugin : IStellarPlugin
         _services.Chat.MessageReceived += _onMessage;
         _services.Framework.Update += _onUpdate;
 
+        // Countdown / raid-warning cards (Plugin.Hud*.cs). Same id + HUD category as the old text overlay, so the saved
+        // position carries over. NORMAL (Menu) surface on purpose — no `Surface = HudOverlay` any more: only the window
+        // path draws the 2.33 rounded bar (CornerRadius / FillColorFn / TrackColorFn) and honours a styled (Bold) text's
+        // FontSize. Borderless = transparent window, so only the cards show.
         _hud = _services.Windows.Register(new WindowRegistration(
             new WindowSpec(
                 "countdown-timer.hud",
@@ -73,7 +88,6 @@ public sealed partial class Plugin : IStellarPlugin
                 WindowCategory.HUD,
                 WindowPanelStyle.Borderless)
             {
-                Surface          = SurfaceStyle.HudOverlay,
                 Anchor           = WindowAnchor.Top,
                 Draggable        = true,
                 EditModeDragOnly = true,
@@ -121,6 +135,7 @@ public sealed partial class Plugin : IStellarPlugin
         _services.Framework.Update -= _onUpdate;
         try { _services.ClientState.Logout -= _onLogout; } catch { }
         StopCenterers();
+        DisposeGameCountdown();   // Plugin.GameCountdown.cs — hand the game its own countdown view back
         DisposeMarks();
         DisposeMechanicCallouts();
         _launcherEntry.Dispose();
