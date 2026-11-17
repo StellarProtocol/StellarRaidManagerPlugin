@@ -10,9 +10,11 @@ namespace Stellar.RaidManager;
 //   [■] (1 Middle) (2 Middle) (3 Inner)                  4.2s
 // swatch = the CURRENT step's safe-ring colour; up to 3 fixed pills (unused slots hidden — the pool never changes, so
 // nothing jumps inside a sequence), each a small rounded BubbleElement "<n> <ring>" ("?" = undecided):
-//   done (already exploded)  low-alpha neutral fill, dimmed muted text
+//   done (already exploded)  dark backing (black α.45), muted text
 //   CURRENT                  filled with its ring colour, dark bold text
-//   upcoming                 neutral low-alpha fill, muted text
+//   upcoming                 dark backing (black α.45), normal theme text
+// The dark backing keeps done/upcoming readable over ANY drain colour (the old neutral α.06/.14 fills with muted text
+// vanished into the row drain fill in-game, 2026-11-17).
 // Timer + drain fill = time until the CURRENT step explodes, from the tracker's existing manual timing (McRingSeq:
 // Purge 10 s after each wave's spawn, Clash/Brutal 5 s after the latest wave's spawn); same format / colour steps as
 // every other row. No current step (all exploded, or an unknown scene without timing) → "—", steady fill.
@@ -23,6 +25,7 @@ public sealed partial class Plugin
     private const int MechPills = McRingSeq.Max;
     private const float MechFontPill = 11f, MechPillPadX = 5f, MechPillGap = 3f;
     private static readonly ColorRgba MechPillDark = new(0.07f, 0.07f, 0.09f, 1f);   // text on a lit ring colour
+    private static readonly ColorRgba MechPillBack = new(0f, 0f, 0f, 0.45f);         // done / upcoming pill backing
 
     private readonly bool[]      _mechIsSeq     = new bool[MechHudSlots];
     private readonly ColorRgba[] _mechSeqSwatch = new ColorRgba[MechHudSlots];
@@ -92,8 +95,8 @@ public sealed partial class Plugin
             if (p >= seq.Count) continue;
             _mechPillText[j] = names[p * 4 + Math.Clamp(seq.Ring[p], 0, 3)];
             if (p == cur) { _mechPillFill[j] = MechanicCalloutData.SlotColor(seq.Color[p]) with { A = 1f }; _mechPillInk[j] = MechPillDark; }
-            else if (seq.IsDone(p, now)) { _mechPillFill[j] = c.HudText with { A = 0.06f }; _mechPillInk[j] = c.MenuMuted with { A = 0.5f }; }
-            else { _mechPillFill[j] = c.HudText with { A = 0.14f }; _mechPillInk[j] = c.MenuMuted; }
+            else if (seq.IsDone(p, now)) { _mechPillFill[j] = MechPillBack; _mechPillInk[j] = c.MenuMuted; }
+            else { _mechPillFill[j] = MechPillBack; _mechPillInk[j] = c.HudText; }
         }
         var mc = MechanicCalloutData.SlotColor(cur >= 0 ? seq.Color[cur] : row.Color);
         _mechSeqSwatch[k] = mc;
