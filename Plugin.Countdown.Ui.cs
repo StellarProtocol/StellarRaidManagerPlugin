@@ -43,6 +43,12 @@ public sealed partial class Plugin
                 SettingRow("rm.ct.command", CtLabelW, CtTip("rm.ct.command", CtSection, HelpText("rm.countdown.help")),
                     null, false,
                     OnOffChip(() => _ctEnabled, v => { _ctEnabled = v; SaveCtBool("ct_enabled", v); })),
+                // Game countdown replacement + /ct sounds (Plugin.GameCountdown.cs). Labels wrap in long locales.
+                SettingRowWrap("rm.ct.replaceGame", CtLabelW,
+                    CtTip("rm.ct.replaceGame", CtSection, HelpText("rm.ct.help.replaceGame")),
+                    OnOffChip(() => _ctReplaceGame, SetReplaceGame)),
+                SettingRowWrap("rm.ct.sounds", CtLabelW, CtTip("rm.ct.sounds", CtSection, HelpText("rm.ct.help.sounds")),
+                    OnOffChip(() => _ctSounds, SetCtSounds)),
                 SettingRow("rm.ct.size", CtLabelW, CtTip("rm.ct.size", CtSection, HelpText("rm.ct.help.size")), null, false,
                     OptionChip(() => _loc.T("rm.size.small"),  () => _sizeMult == 0.5f,  () => SetSize("small")),
                     OptionChip(() => _loc.T("rm.size.medium"), () => _sizeMult == 0.75f, () => SetSize("medium")),
@@ -101,7 +107,7 @@ public sealed partial class Plugin
         if (_rwUseIngameWarning)
             _services.NoticeTips.Create(NoticeTipType.Special).WithContent(_loc.T("rm.test.raidWarning"))
                 .WithAudio(NoticeTipAudio.DungeonVictory).WithDuration(5f).Show();
-        else { _rwText = _loc.T("rm.test.raidWarning"); _rwVisible = true; _rwTimer = 5.0; _hud.MarkDirty(); }
+        else { _rwText = _loc.T("rm.test.raidWarning"); _rwSender = string.Empty; _rwVisible = true; _rwTimer = 5.0; _hud.MarkDirty(); }
     }
 
     // ── status (window header AND hub card) ───────────────────────────────────────────────────────────────────────

@@ -34,6 +34,21 @@ public sealed partial class Plugin
         return new RowElement(items, Gap: RowGap);
     }
 
+    // Same row for an always-enabled setting whose label may run long in some locales ("Replace game countdown" in
+    // fil/id/th): the label WRAPS to at most 2 lines in its column instead of being cut with "…" (MaxLines, fw 2.30).
+    private HudElement SettingRowWrap(string labelKey, float labelW, HelpTip tip, params HudElement[] controls)
+    {
+        var items = new List<HudElement>(controls.Length + 3)
+        {
+            new TextElement(() => _loc.T(labelKey), Color: () => TextColor(), Width: labelW, FontSize: 13)
+                { Bold = true, MaxLines = 2 },
+        };
+        items.AddRange(controls);
+        items.Add(new SpacerElement(0f));   // flexible: pushes the "?" to the right edge
+        items.Add(HelpDot(tip));
+        return new RowElement(items, Gap: RowGap);
+    }
+
     private HudElement RowLabel(string labelKey, float width, Func<bool>? enabled)
     {
         var disabled = new DisabledLabelCache();
