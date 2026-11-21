@@ -6,9 +6,18 @@ namespace Stellar.RaidManager;
 //
 // The game's leader countdown (team window → fixed 10 s, notify → TeamData:StartTeamConfirmTimer(startSec)) is detected
 // and hidden from the Lua side, and shown as OUR countdown card instead:
-//   • team_data StartTeamConfirmTimer / StopTeamConfirmTimer are wrapped ON THE INSTANCE (Z.DataMgr.Get("team_data")):
-//     the wrapper parks {kind, startSec, total, nowMs} + a sequence counter in rawset globals, then calls the original.
-//     The game's 1 s data timer keeps playing ITS sounds (they're owned by the data timer, not the view).
+//   • TeamData StartTeamConfirmTimer / StopTeamConfirmTimer are wrapped ON THE CLASS (require "ui.model.team_data", the
+//     DOT path DataMgr itself requires → the same table): the wrapper parks {kind, startSec, total, nowMs} + a sequence
+//     counter in rawset globals, then calls the original. The game's 1 s data timer keeps playing ITS sounds (they're
+//     owned by the data timer, not the view). class() instances copy no methods (zutil/class.lua new →
+//     setmetatableindex(instance, cls)), so every instance reaches the wrapper through __index.
+//     ⚠️ We must NEVER call Z.DataMgr.Get("team_data") from the install timer (v2.9.0 did): DataMgr caches the object
+//     BEFORE Init(), so if we are the first caller while TeamTargetTableMgr isn't registered yet (tables load async;
+//     world-active ≠ tables ready) Init throws inside our pcall and a half-built team_data sticks for the session —
+//     My Party then shows "Loading" forever (KB Lua-Injection-from-CSharp.md "Z.DataMgr.Get caches BEFORE Init()").
+//     The same 2 s install also SELF-HEALS such a session (ours from 2.9.0, or another mod's): it peeks DataMgr's
+//     cached_data upvalue via debug.getupvalue (never creates team_data), and if the cached instance lacks
+//     TeamTargetTableDatas once the table is registered, re-runs InitCfgData once and bumps _rm_td_healed (logged once).
 //   • mainui_team_countdown_ui_comp.refreshTeamCountDownView is overridden on the module table (DOT require — the form
 //     mainui_view uses; a slash require would be a second, unused copy): while replace is ON it only DeActives the
 //     game's main_team_time_sub view; OFF calls the original. The StartConfirmCountDown handler is NOT touched (it is
@@ -20,8 +29,8 @@ namespace Stellar.RaidManager;
 //     after its sound) parks teamCountDown in _rm_gct_count and bumps _rm_gct_tick; the start wrapper parks the initial
 //     teamCountDown. The card shows exactly that count and flips on the tick (see AdvanceLockedCountdown).
 // Everything is defined ONCE as rawset globals (the game's _G drops plain global writes) and re-defined only if a Lua
-// reset lost them; install is idempotent (per-instance / per-module markers) and re-run every 2 s so a reloaded module
-// or a new team_data instance gets wrapped again.
+// reset lost them; install is idempotent (per-module markers) and re-run every 2 s so a reloaded module gets wrapped
+// again.
 public sealed partial class Plugin
 {
     private const string GctDefChunk = @"pcall(function()
@@ -43,11 +52,13 @@ end)
 rawset(_G, '__rm_gctInstall', function()
   __rm_gctListen()
   pcall(function()
-    local td = Z.DataMgr.Get('team_data')
-    if td ~= nil and rawget(td, '__rm_gct') ~= true then
-      local start, stop = td.StartTeamConfirmTimer, td.StopTeamConfirmTimer
+    local C = require('ui.model.team_data')
+    if type(C) == 'table' and rawget(C, '__rm_gct') ~= true then
+      local start, stop = rawget(C, 'StartTeamConfirmTimer'), rawget(C, 'StopTeamConfirmTimer')
       if start ~= nil and stop ~= nil then
-        rawset(td, 'StartTeamConfirmTimer', function(self, startSec)
+        rawset(C, '__rm_gctStart', start)
+        rawset(C, '__rm_gctStop', stop)
+        rawset(C, 'StartTeamConfirmTimer', function(self, startSec)
           pcall(function()
             rawset(_G, '_rm_gct_start', tonumber(startSec) or 0)
             rawset(_G, '_rm_gct_total', tonumber(Z.Global.TeamConfirmTotalTime) or 10)
@@ -62,14 +73,33 @@ rawset(_G, '__rm_gctInstall', function()
           end)
           return r
         end)
-        rawset(td, 'StopTeamConfirmTimer', function(self)
+        rawset(C, 'StopTeamConfirmTimer', function(self)
           pcall(function()
             rawset(_G, '_rm_gct_kind', 2)
             rawset(_G, '_rm_gct_seq', (rawget(_G, '_rm_gct_seq') or 0) + 1)
           end)
           return stop(self)
         end)
-        rawset(td, '__rm_gct', true)
+        rawset(C, '__rm_gct', true)
+      end
+    end
+  end)
+  pcall(function()
+    if Z.TableMgr.GetTable('TeamTargetTableMgr') == nil then return end
+    local up = debug ~= nil and debug.getupvalue or nil
+    if up == nil then return end
+    local cache
+    for i = 1, 8 do
+      local n, v = up(Z.DataMgr.Get, i)
+      if n == nil then break end
+      if n == 'cached_data' then cache = v break end
+    end
+    local td = type(cache) == 'table' and rawget(cache, 'team_data') or nil
+    if td ~= nil and rawget(td, 'TeamTargetTableDatas') == nil and rawget(td, '__rm_healed') ~= true then
+      rawset(td, '__rm_healed', true)
+      td:InitCfgData()
+      if rawget(td, 'TeamTargetTableDatas') ~= nil then
+        rawset(_G, '_rm_td_healed', (rawget(_G, '_rm_td_healed') or 0) + 1)
       end
     end
   end)
@@ -122,6 +152,7 @@ end)";
     private float _gctInstallAcc = GctInstallEvery;   // first world tick installs at once
     private float _gctPollAcc;
     private double _gctSeq = -1d;                     // last seen sequence; < 0 = take a baseline first
+    private double _tdHealed;                         // last seen _rm_td_healed (team_data self-heal count)
 
     // Defines the Lua side if it isn't there (first use, or a Lua reset dropped the globals) and re-asserts the replace
     // flag. A typed bool read when it is already defined.
@@ -142,7 +173,16 @@ end)";
         if ((_gctInstallAcc += dt) >= GctInstallEvery)
         {
             _gctInstallAcc = 0f;
-            if (EnsureGctLua()) _services.Lua.DoString(GctInstallCall);
+            if (EnsureGctLua())
+            {
+                _services.Lua.DoString(GctInstallCall);
+                // Self-heal report: one typed read at the 2 s cadence, a log line only when the count goes up.
+                if (_services.Lua.TryReadGlobalNumber("_rm_td_healed", out var healed) && healed > _tdHealed)
+                {
+                    _tdHealed = healed;
+                    _services.Log.Info("[RaidManager] repaired party data (team target table)");
+                }
+            }
         }
         if ((_gctPollAcc += dt) < GctPollEvery) return;
         _gctPollAcc = 0f;
